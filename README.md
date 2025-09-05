@@ -1,6 +1,8 @@
 # Omarchy Cleaner
 
-A text-based interactive shell script to remove unwanted default applications and webapps from Omarchy Linux installations.
+> If Omarchy is the omakase of Linux distros, a curated feast of pre-installed apps and webapps, Omarchy Cleaner is your trusty pair of chopsticks to pluck away the unwanted wasabi for a perfectly tailored system. 🥢
+
+A text-based interactive shell script to remove unwanted default applications and webapps from Omarchy installations.
 
 ![Screenshot of Omarchy Cleaner.](./screenshot.png)
 

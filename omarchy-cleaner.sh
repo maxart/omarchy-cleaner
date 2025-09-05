@@ -315,7 +315,7 @@ simple_select_packages() {
         echo -e "  • ${GREEN}C${NC} to continue"
         echo -e "  • ${RED}Q${NC} to quit"
         echo ""
-        read -p "Choice: " choice
+        read -p "Choice: " choice </dev/tty
         
         case $choice in
             [1-9]|[1-9][0-9])
@@ -356,7 +356,7 @@ simple_select_packages() {
                 if [[ ${#selected_packages[@]} -eq 0 ]] && [[ ${#selected_webapps[@]} -eq 0 ]]; then
                     echo ""
                     echo -e "${YELLOW}No items selected! Please select at least one item.${NC}"
-                    read -p "Press Enter to continue..."
+                    read -p "Press Enter to continue..." </dev/tty
                 else
                     SELECTED_PACKAGES="${selected_packages[*]}"
                     SELECTED_WEBAPPS="${selected_webapps[*]}"
@@ -527,7 +527,7 @@ main() {
     fi
     
     echo "Press Enter to continue to item selection, or Ctrl+C to exit..."
-    read
+    read </dev/tty
     
     # Combine packages and webapps with separator
     local all_items=()
@@ -590,14 +590,14 @@ main() {
     
     echo -e "${YELLOW}This action cannot be undone.${NC}"
     echo ""
-    read -p "Type 'yes' to confirm removal, or anything else to cancel: " confirm
+    read -p "Type 'yes' to confirm removal, or anything else to cancel: " confirm </dev/tty
     
     if [[ "$confirm" == "yes" ]]; then
         clear
         remove_items "${items_to_remove[@]}"
         echo ""
         echo "Press Enter to exit..."
-        read
+        read </dev/tty
     else
         echo -e "\n${YELLOW}Operation cancelled.${NC}"
     fi

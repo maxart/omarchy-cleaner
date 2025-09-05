@@ -2,6 +2,7 @@
 
 A text-based interactive shell script to remove unwanted default applications and webapps from Omarchy Linux installations.
 
+![Screenshot of Omarchy Cleaner.](./screenshot.png)
 
 ## Quick Start
 
@@ -66,3 +67,8 @@ DEFAULT_WEBAPPS=(
 ```
 
 Simply uncomment or comment out items in these lists to customize what the cleaner offers to remove. The script contains the full list of all Omarchy default packages (100+ items), with only commonly unwanted applications active by default.
+
+
+## License
+
+Omarchy Cleaner is released under the [MIT License](https://opensource.org/licenses/MIT).

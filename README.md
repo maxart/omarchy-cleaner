@@ -11,13 +11,6 @@ Run directly without downloading:
 curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy-cleaner.sh | bash
 ```
 
-Or download and run:
-
-```bash
-wget https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy-cleaner.sh
-chmod +x omarchy-cleaner.sh
-./omarchy-cleaner.sh
-```
 
 ## Features
 

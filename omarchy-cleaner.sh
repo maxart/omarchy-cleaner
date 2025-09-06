@@ -26,6 +26,9 @@ DEFAULT_APPS=(
     "signal-desktop"
     "spotify"
     "xournalpp"
+    "docker"
+    "docker-buildx"
+    "docker-compose"
     
     # Uncomment to include in removal list
     # "asdcontrol-git"
@@ -42,9 +45,6 @@ DEFAULT_APPS=(
     # "cups-browsed"
     # "cups-filters"
     # "cups-pdf"
-    # "docker"
-    # "docker-buildx"
-    # "docker-compose"
     # "dust"
     # "evince"
     # "eza"

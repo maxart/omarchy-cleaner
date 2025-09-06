@@ -66,8 +66,16 @@ DEFAULT_WEBAPPS=(
     "HEY"
     "Basecamp"
     "WhatsApp"
+    "Google Photos"
+    "Google Contacts"
+    "Google Messages"
+    "ChatGPT"
+    "YouTube"
+    "GitHub"
+    "X"
+    "Figma"
     "Discord"
-    # ...
+    "Zoom"
 )
 ```
 

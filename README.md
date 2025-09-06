@@ -100,6 +100,18 @@ The script can automatically detect and remove keyboard shortcuts associated wit
 
 The matching is case-insensitive and handles various command formats used in Omarchy's bindings configuration.
 
+## App Screenshots
+
+<details>
+<summary>View</summary>
+
+![Screenshot 2](./media/screenshot-2.png)
+![Screenshot 3](./media/screenshot-3.png)
+![Screenshot 4](./media/screenshot-4.png)
+![Screenshot 5](./media/screenshot-5.png)
+
+</details>
+
 
 ## Default Omarchy packages and webapps
 You can find the default Omarchy package list [here](https://github.com/basecamp/omarchy/blob/master/install/packages.sh) and the default webapps [here](https://github.com/basecamp/omarchy/blob/master/install/packaging/webapps.sh).

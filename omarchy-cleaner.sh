@@ -418,7 +418,7 @@ simple_select_packages() {
     while true; do
         clear
         echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-        echo -e "${BLUE}║         Omarchy Cleaner v1.0           ║${NC}"
+        echo -e "${BLUE}║         Omarchy Cleaner v1.1           ║${NC}"
         echo -e "${BLUE}║   Remove unwanted default applications ║${NC}"
         echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
         echo ""
@@ -753,7 +753,7 @@ remove_items() {
 main() {
     clear
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║         Omarchy Cleaner v1.0           ║${NC}"
+    echo -e "${BLUE}║         Omarchy Cleaner v1.1           ║${NC}"
     echo -e "${BLUE}║   Remove unwanted default applications ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
     echo ""

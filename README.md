@@ -51,6 +51,9 @@ DEFAULT_APPS=(
     "signal-desktop"
     "spotify"
     "xournalpp"
+    "docker"
+    "docker-buildx"
+    "docker-compose"
     
     # Additional packages can be uncommented to include them
     # See the full list of Omarchy default packages in the script

@@ -82,6 +82,10 @@ DEFAULT_WEBAPPS=(
 Simply uncomment or comment out items in these lists to customize what the cleaner offers to remove. The script contains the full list of all Omarchy default packages (100+ items), with only commonly unwanted applications active by default.
 
 
+## Default Omarchy packages and webapps
+You can find the default Omarchy package list [here](https://github.com/basecamp/omarchy/blob/master/install/packages.sh) and the default webapps [here](https://github.com/basecamp/omarchy/blob/master/install/packaging/webapps.sh).
+
+
 ## License
 
 Omarchy Cleaner is released under the [MIT License](https://opensource.org/licenses/MIT).

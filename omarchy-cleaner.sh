@@ -561,7 +561,7 @@ remove_webapps() {
         # Show current progress
         gum style --foreground 51 "[$current/$total] Processing: $webapp"
         
-        if gum spin --spinner dot --title "Removing $webapp..." -- omarchy-webapp-remove "$webapp" 2>/dev/null; then
+        if gum spin --spinner dot --title "Removing $webapp..." -- bash -c "omarchy-webapp-remove '$webapp' >/dev/null 2>&1"; then
             gum log --level info "✓ Removed: $webapp"
             removed_webapps+=("$webapp")
         else

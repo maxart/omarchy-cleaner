@@ -185,24 +185,20 @@ is_webapp_installed() {
 
 # Function to get list of installed packages from our removal list
 get_installed_packages() {
-    local installed=()
     for app in "${DEFAULT_APPS[@]}"; do
         if is_package_installed "$app"; then
-            installed+=("$app")
+            echo "$app"
         fi
     done
-    echo "${installed[@]}"
 }
 
 # Function to get list of installed webapps from our removal list
 get_installed_webapps() {
-    local installed=()
     for webapp in "${DEFAULT_WEBAPPS[@]}"; do
         if is_webapp_installed "$webapp"; then
-            installed+=("$webapp")
+            echo "$webapp"
         fi
     done
-    echo "${installed[@]}"
 }
 
 # Function to find keyboard bindings for an app/webapp
@@ -762,8 +758,8 @@ main() {
     echo ""
     
     # Get list of installed packages and webapps
-    local installed_packages=($(get_installed_packages))
-    local installed_webapps=($(get_installed_webapps))
+    readarray -t installed_packages < <(get_installed_packages)
+    readarray -t installed_webapps < <(get_installed_webapps)
     
     if [[ ${#installed_packages[@]} -eq 0 ]] && [[ ${#installed_webapps[@]} -eq 0 ]]; then
         echo -e "${GREEN}✓ No packages or webapps from the removal lists are currently installed.${NC}"

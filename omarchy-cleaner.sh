@@ -1,15 +1,10 @@
 #!/bin/bash
 
 # Omarchy Cleaner - Remove unwanted default applications from Omarchy
+# Enhanced with gum for a better TUI experience
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+# Version
+VERSION="2.0"
 
 # Configuration
 BINDINGS_FILE="$HOME/.config/hypr/bindings.conf"
@@ -322,14 +317,14 @@ remove_bindings_from_file() {
     fi
     
     if [[ ! -f "$BINDINGS_FILE" ]]; then
-        echo -e "${YELLOW}Bindings file not found at $BINDINGS_FILE${NC}"
+        gum log --level warn "Bindings file not found at $BINDINGS_FILE"
         return 1
     fi
     
     # Create backup
     local backup_file="${BINDINGS_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
     cp "$BINDINGS_FILE" "$backup_file"
-    echo -e "${CYAN}Created backup: $backup_file${NC}"
+    gum log --level info "Created backup: $backup_file"
     
     # Create temporary file
     local temp_file=$(mktemp)
@@ -357,19 +352,17 @@ remove_bindings_from_file() {
     # Replace original file with temp file
     mv "$temp_file" "$BINDINGS_FILE"
     
-    echo -e "${GREEN}Removed $removed_count keyboard binding(s)${NC}"
+    gum log --level info "✓ Removed $removed_count keyboard binding(s)"
     return 0
 }
 
 
-# Simple text-based selection menu
-simple_select_packages() {
+# Enhanced selection menu using gum with integrated keyboard toggle
+enhanced_select_packages() {
     local installed_packages=("$@")
-    local installed_webapps=()
     local all_items=()
     local item_types=()
-    local selected_status=()
-    local selected_packages=()
+    local display_items=()
     local bindings_found=()
     
     # Parse arguments - first determine where packages end and webapps begin
@@ -399,179 +392,147 @@ simple_select_packages() {
         done
     fi
     
-    # Initialize all as unselected and check for bindings
+    # Build display items with type indicators and binding markers
     for i in "${!all_items[@]}"; do
-        selected_status[$i]=0
+        local prefix=""
+        if [[ "${item_types[$i]}" == "webapp" ]]; then
+            prefix="🌐 "
+        else
+            prefix="📦 "
+        fi
+        
         # Check if this item has keyboard bindings
         local item_bindings=$(find_app_bindings "${all_items[$i]}")
         if [[ -n "$item_bindings" ]]; then
             bindings_found[$i]=1
+            display_items+=("${prefix}${all_items[$i]} ⌨")
         else
             bindings_found[$i]=0
+            display_items+=("${prefix}${all_items[$i]}")
         fi
     done
     
-    while true; do
+    # Check if any items have bindings
+    local has_bindings=false
+    for bf in "${bindings_found[@]}"; do
+        [[ $bf -eq 1 ]] && has_bindings=true && break
+    done
+    
+    # Function to display the main interface header
+    show_main_header() {
+        # Show header with style
         clear
-        echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-        echo -e "${BLUE}║         Omarchy Cleaner v1.1           ║${NC}"
-        echo -e "${BLUE}║   Remove unwanted default applications ║${NC}"
-        echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
-        echo ""
-        echo -e "${CYAN}Items available for removal:${NC}"
+        gum style \
+            --border double \
+            --border-foreground 39 \
+            --padding "1 2" \
+            --width 50 \
+            --align center \
+            "Omarchy Cleaner v$VERSION" \
+            "Remove unwanted default applications"
+        
         echo ""
         
-        # Display packages section if any exist
-        local has_packages=false
-        local has_webapps=false
+        # Show item counts
+        local pkg_count=0
+        local webapp_count=0
         for type in "${item_types[@]}"; do
             if [[ "$type" == "package" ]]; then
-                has_packages=true
-            elif [[ "$type" == "webapp" ]]; then
-                has_webapps=true
-            fi
-        done
-        
-        if [[ "$has_packages" == true ]]; then
-            echo -e "${BOLD}Apps found:${NC}"
-        fi
-        
-        # Display items with selection status
-        for i in "${!all_items[@]}"; do
-            if [[ "${item_types[$i]}" == "webapp" ]] && [[ "$has_webapps" == true ]] && [[ "$has_packages" == true ]]; then
-                # Print webapp header only once
-                local first_webapp=true
-                for ((j=0; j<i; j++)); do
-                    if [[ "${item_types[$j]}" == "webapp" ]]; then
-                        first_webapp=false
-                        break
-                    fi
-                done
-                if [[ "$first_webapp" == true ]]; then
-                    echo ""
-                    echo -e "${BOLD}Webapps found:${NC}"
-                fi
-            fi
-            
-            local num=$((i+1))
-            local prefix=""
-            if [[ "${item_types[$i]}" == "webapp" ]]; then
-                prefix="[WebApp] "
-            fi
-            
-            local binding_indicator=""
-            if [[ ${bindings_found[$i]} -eq 1 ]]; then
-                binding_indicator=" ${CYAN}[⌨]${NC}"
-            fi
-            
-            if [[ ${selected_status[$i]} -eq 1 ]]; then
-                echo -e "  ${GREEN}[$num]${NC} ✓ $prefix${all_items[$i]}$binding_indicator"
+                ((pkg_count++))
             else
-                echo -e "  ${YELLOW}[$num]${NC}   $prefix${all_items[$i]}$binding_indicator"
+                ((webapp_count++))
             fi
         done
+        
+        gum style \
+            --foreground 214 \
+            --bold \
+            "Found $pkg_count packages and $webapp_count webapps"
+        
+        echo ""
+    }
+    
+    # App selection interface - no keyboard toggle here anymore
+    while true; do
+        show_main_header
+        
+        # Show help text for selection
+        gum style \
+            --foreground 51 \
+            --italic \
+            "Select items to remove (Tab to select, Enter to confirm)"
+        
+        if [[ "$has_bindings" == true ]]; then
+            gum style \
+                --foreground 39 \
+                --italic \
+                "(⌨ = has keyboard shortcuts - you'll be asked about cleanup next)"
+        fi
         
         echo ""
         
-        # Count selected
-        local count=0
-        for status in "${selected_status[@]}"; do
-            [[ $status -eq 1 ]] && ((count++))
-        done
-        echo -e "${BOLD}Currently selected: ${GREEN}$count${NC} of ${#all_items[@]} items"
+        selected_items=$(printf '%s\n' "${display_items[@]}" | \
+            gum filter \
+                --limit 0 \
+                --no-limit \
+                --indicator " ▸" \
+                --selected-prefix " ✓ " \
+                --unselected-prefix "   " \
+                --placeholder "Type to filter..." \
+                --header "Select items to remove:" \
+                --height 15)
         
-        # Show binding cleanup status
-        local has_bindings=false
-        for bf in "${bindings_found[@]}"; do
-            [[ $bf -eq 1 ]] && has_bindings=true && break
-        done
+        # Check if user cancelled
+        if [[ $? -ne 0 ]]; then
+            return 1
+        fi
         
-        if [[ "$has_bindings" == true ]]; then
+        # Check if no items selected
+        if [[ -z "$selected_items" ]]; then
             echo ""
-            if [[ "$REMOVE_BINDINGS" == true ]]; then
-                echo -e "${BOLD}Keyboard shortcut cleanup: ${GREEN}ON${NC} ${CYAN}[⌨]${NC} = has keyboard shortcuts"
+            gum style \
+                --foreground 214 \
+                "No items selected! Please select at least one item."
+            echo ""
+            echo "Press Enter to try again or Ctrl+C to exit..."
+            if [[ -t 0 ]]; then
+                read </dev/tty
             else
-                echo -e "${BOLD}Keyboard shortcut cleanup: ${YELLOW}OFF${NC} ${CYAN}[⌨]${NC} = has keyboard shortcuts"
-            fi
-        fi
-        echo ""
-        
-        echo -e "${BOLD}Enter your choice:${NC}"
-        echo -e "  • ${CYAN}1-${#all_items[@]}${NC} to toggle an item"
-        echo -e "  • ${CYAN}A${NC} to select all"
-        echo -e "  • ${CYAN}N${NC} to select none"
-        if [[ "$has_bindings" == true ]]; then
-            echo -e "  • ${CYAN}K${NC} to toggle keyboard shortcut cleanup"
-        fi
-        echo -e "  • ${GREEN}C${NC} to continue"
-        echo -e "  • ${RED}Q${NC} to quit"
-        echo ""
-        read -p "Choice: " choice </dev/tty
-        
-        case $choice in
-            [1-9]|[1-9][0-9])
-                if [[ $choice -le ${#all_items[@]} ]] && [[ $choice -ge 1 ]]; then
-                    local idx=$((choice-1))
-                    if [[ ${selected_status[$idx]} -eq 1 ]]; then
-                        selected_status[$idx]=0
-                    else
-                        selected_status[$idx]=1
-                    fi
-                fi
-                ;;
-            [aA])
-                for i in "${!all_items[@]}"; do
-                    selected_status[$i]=1
-                done
-                ;;
-            [nN])
-                for i in "${!all_items[@]}"; do
-                    selected_status[$i]=0
-                done
-                ;;
-            [kK])
-                if [[ "$has_bindings" == true ]]; then
-                    if [[ "$REMOVE_BINDINGS" == true ]]; then
-                        REMOVE_BINDINGS=false
-                    else
-                        REMOVE_BINDINGS=true
-                    fi
-                fi
-                ;;
-            [cC])
-                # Collect selected items with their types
-                local selected_packages=()
-                local selected_webapps=()
-                
-                for i in "${!all_items[@]}"; do
-                    if [[ ${selected_status[$i]} -eq 1 ]]; then
-                        if [[ "${item_types[$i]}" == "webapp" ]]; then
-                            selected_webapps+=("${all_items[$i]}")
-                        else
-                            selected_packages+=("${all_items[$i]}")
-                        fi
-                    fi
-                done
-                
-                if [[ ${#selected_packages[@]} -eq 0 ]] && [[ ${#selected_webapps[@]} -eq 0 ]]; then
-                    echo ""
-                    echo -e "${YELLOW}No items selected! Please select at least one item.${NC}"
-                    read -p "Press Enter to continue..." </dev/tty
-                else
-                    SELECTED_PACKAGES="${selected_packages[*]}"
-                    SELECTED_WEBAPPS="${selected_webapps[*]}"
-                    return 0
-                fi
-                ;;
-            [qQ])
-                return 1
-                ;;
-            *)
-                echo -e "${RED}Invalid option!${NC}"
+                echo "(Non-interactive mode, retrying...)"
                 sleep 1
-                ;;
-        esac
+            fi
+            # Continue loop to try again
+            continue
+        fi
+        
+        # Valid selection made, break out of loop
+        break
     done
+    
+    # Parse selected items back to original names
+    local selected_packages=()
+    local selected_webapps=()
+    
+    while IFS= read -r selected_item; do
+        # Remove emoji prefix (📦 or 🌐) and keyboard marker (⌨)
+        local clean_item=$(echo "$selected_item" | sed 's/^[📦🌐] //' | sed 's/ ⌨$//')
+        
+        # Find matching item in original arrays
+        for i in "${!all_items[@]}"; do
+            if [[ "${all_items[$i]}" == "$clean_item" ]]; then
+                if [[ "${item_types[$i]}" == "webapp" ]]; then
+                    selected_webapps+=("$clean_item")
+                else
+                    selected_packages+=("$clean_item")
+                fi
+                break
+            fi
+        done
+    done <<< "$selected_items"
+    
+    SELECTED_PACKAGES="${selected_packages[*]}"
+    SELECTED_WEBAPPS="${selected_webapps[*]}"
+    return 0
 }
 
 # Function to remove webapps
@@ -584,26 +545,49 @@ remove_webapps() {
         return 0
     fi
     
-    echo -e "\n${BLUE}Starting webapp removal...${NC}\n"
+    echo ""
+    gum style \
+        --foreground 39 \
+        --bold \
+        "🌐 Removing ${#webapps[@]} webapp(s)..."
+    echo ""
+    
+    local current=0
+    local total=${#webapps[@]}
     
     for webapp in "${webapps[@]}"; do
-        echo -e "${YELLOW}Removing $webapp webapp...${NC}"
-        if omarchy-webapp-remove "$webapp" 2>/dev/null; then
-            echo -e "${GREEN}✓ Successfully removed $webapp webapp${NC}"
+        ((current++))
+        
+        # Show current progress
+        gum style --foreground 51 "[$current/$total] Processing: $webapp"
+        
+        if gum spin --spinner dot --title "Removing $webapp..." -- omarchy-webapp-remove "$webapp" 2>/dev/null; then
+            gum log --level info "✓ Removed: $webapp"
             removed_webapps+=("$webapp")
         else
-            echo -e "${RED}✗ Failed to remove $webapp webapp${NC}"
+            gum log --level error "✗ Failed: $webapp"
             failed_webapps+=("$webapp")
         fi
+        
+        # Show progress bar
+        local percentage=$(( (current * 100) / total ))
+        local filled=$(( percentage / 5 ))
+        local empty=$(( (100 - percentage) / 5 ))
+        
+        printf "Progress: "
+        printf '\033[92m█%.0s\033[0m' $(seq 1 $filled)
+        printf '\033[90m░%.0s\033[0m' $(seq 1 $empty)
+        printf " %d%% (%d/%d)\n" "$percentage" "$current" "$total"
         echo ""
     done
     
     # Summary for webapps
+    echo ""
     if [[ ${#removed_webapps[@]} -gt 0 ]]; then
-        echo -e "${GREEN}Successfully removed webapps: ${removed_webapps[*]}${NC}"
+        gum style --foreground 82 "Successfully removed: ${removed_webapps[*]}"
     fi
     if [[ ${#failed_webapps[@]} -gt 0 ]]; then
-        echo -e "${YELLOW}Could not remove webapps: ${failed_webapps[*]}${NC}"
+        gum style --foreground 214 "Could not remove: ${failed_webapps[*]}"
     fi
 }
 
@@ -617,26 +601,49 @@ remove_packages() {
         return 0
     fi
     
-    echo -e "\n${BLUE}Starting package removal...${NC}\n"
+    echo ""
+    gum style \
+        --foreground 39 \
+        --bold \
+        "📦 Removing ${#packages[@]} package(s)..."
+    echo ""
+    
+    local current=0
+    local total=${#packages[@]}
     
     for pkg in "${packages[@]}"; do
-        echo -e "${YELLOW}Removing $pkg...${NC}"
-        if sudo pacman -Rns --noconfirm "$pkg" 2>/dev/null; then
-            echo -e "${GREEN}✓ Successfully removed $pkg${NC}"
+        ((current++))
+        
+        # Show current progress
+        gum style --foreground 51 "[$current/$total] Processing: $pkg"
+        
+        if gum spin --spinner dot --title "Removing $pkg..." -- sudo pacman -Rns --noconfirm "$pkg" 2>/dev/null; then
+            gum log --level info "✓ Removed: $pkg"
             removed_packages+=("$pkg")
         else
-            echo -e "${RED}✗ Failed to remove $pkg (may already be removed or have dependencies)${NC}"
+            gum log --level warn "✗ Failed: $pkg (may have dependencies)"
             failed_packages+=("$pkg")
         fi
+        
+        # Show progress bar
+        local percentage=$(( (current * 100) / total ))
+        local filled=$(( percentage / 5 ))
+        local empty=$(( (100 - percentage) / 5 ))
+        
+        printf "Progress: "
+        printf '\033[92m█%.0s\033[0m' $(seq 1 $filled)
+        printf '\033[90m░%.0s\033[0m' $(seq 1 $empty)
+        printf " %d%% (%d/%d)\n" "$percentage" "$current" "$total"
         echo ""
     done
     
     # Summary for packages
+    echo ""
     if [[ ${#removed_packages[@]} -gt 0 ]]; then
-        echo -e "${GREEN}Successfully removed packages: ${removed_packages[*]}${NC}"
+        gum style --foreground 82 "Successfully removed: ${removed_packages[*]}"
     fi
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
-        echo -e "${YELLOW}Could not remove packages: ${failed_packages[*]}${NC}"
+        gum style --foreground 214 "Could not remove: ${failed_packages[*]}"
     fi
 }
 
@@ -669,15 +676,14 @@ remove_items() {
         
         # Collect bindings to remove if enabled
         if [[ "$REMOVE_BINDINGS" == true ]]; then
-            echo -e "\n${BLUE}Checking for keyboard shortcuts to remove...${NC}\n"
+            echo ""
+            gum style --foreground 51 "Checking for keyboard shortcuts..."
             
             for pkg in "${pkg_array[@]}"; do
                 local pkg_bindings=$(find_app_bindings "$pkg")
                 if [[ -n "$pkg_bindings" ]]; then
-                    echo -e "${CYAN}Found binding(s) for $pkg:${NC}"
                     while IFS= read -r binding; do
                         if [[ -n "$binding" ]]; then
-                            echo "  $binding"
                             all_bindings_to_remove+=("$binding")
                         fi
                     done <<< "$pkg_bindings"
@@ -687,10 +693,8 @@ remove_items() {
             for webapp in "${webapp_array[@]}"; do
                 local webapp_bindings=$(find_app_bindings "$webapp")
                 if [[ -n "$webapp_bindings" ]]; then
-                    echo -e "${CYAN}Found binding(s) for $webapp:${NC}"
                     while IFS= read -r binding; do
                         if [[ -n "$binding" ]]; then
-                            echo "  $binding"
                             all_bindings_to_remove+=("$binding")
                         fi
                     done <<< "$webapp_bindings"
@@ -700,9 +704,11 @@ remove_items() {
             # Remove bindings first
             if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
                 echo ""
+                gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
                 remove_bindings_from_file "${all_bindings_to_remove[@]}"
             else
-                echo -e "${GREEN}No keyboard shortcuts found for selected items${NC}"
+                echo ""
+                gum log --level info "No keyboard shortcuts found"
             fi
         fi
         
@@ -712,15 +718,14 @@ remove_items() {
         # All are packages
         # Collect bindings to remove if enabled
         if [[ "$REMOVE_BINDINGS" == true ]]; then
-            echo -e "\n${BLUE}Checking for keyboard shortcuts to remove...${NC}\n"
+            echo ""
+            gum style --foreground 51 "Checking for keyboard shortcuts..."
             
             for pkg in "${packages[@]}"; do
                 local pkg_bindings=$(find_app_bindings "$pkg")
                 if [[ -n "$pkg_bindings" ]]; then
-                    echo -e "${CYAN}Found binding(s) for $pkg:${NC}"
                     while IFS= read -r binding; do
                         if [[ -n "$binding" ]]; then
-                            echo "  $binding"
                             all_bindings_to_remove+=("$binding")
                         fi
                     done <<< "$pkg_bindings"
@@ -730,9 +735,11 @@ remove_items() {
             # Remove bindings first
             if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
                 echo ""
+                gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
                 remove_bindings_from_file "${all_bindings_to_remove[@]}"
             else
-                echo -e "${GREEN}No keyboard shortcuts found for selected items${NC}"
+                echo ""
+                gum log --level info "No keyboard shortcuts found"
             fi
         fi
         
@@ -740,60 +747,65 @@ remove_items() {
     fi
     
     # Final summary
-    echo -e "${BLUE}═══════════════════════════════════════${NC}"
-    echo -e "${GREEN}Removal process completed!${NC}"
-    echo -e "${BLUE}═══════════════════════════════════════${NC}"
+    echo ""
+    gum style \
+        --border double \
+        --border-foreground 82 \
+        --padding "1 2" \
+        --margin "1" \
+        --align center \
+        "✓ Removal process completed!"
 }
 
 # Main function
 main() {
     clear
-    echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║         Omarchy Cleaner v1.1           ║${NC}"
-    echo -e "${BLUE}║   Remove unwanted default applications ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+    
+    # Show stylish welcome banner
+    gum style \
+        --border double \
+        --border-foreground 39 \
+        --margin "1" \
+        --padding "1 2" \
+        --width 60 \
+        --align center \
+        --bold \
+        "OMARCHY CLEANER" \
+        "" \
+        "Version $VERSION" \
+        "" \
+        "If Omarchy is the omakase of Linux distros," \
+        "this is your trusty pair of chopsticks 🥢"
+    
     echo ""
     
-    echo -e "${CYAN}Checking for installed packages and webapps...${NC}"
+    # Show scanning message
+    gum style --foreground 51 "🔍 Scanning for installed packages and webapps..."
     echo ""
     
-    # Get list of installed packages and webapps
+    # Show spinners while scanning (the actual functions are fast, so we add a small delay for visual feedback)
+    gum spin --spinner globe --title "Checking packages..." -- sleep 0.8
     readarray -t installed_packages < <(get_installed_packages)
+    
+    gum spin --spinner globe --title "Checking webapps..." -- sleep 0.8
     readarray -t installed_webapps < <(get_installed_webapps)
     
     if [[ ${#installed_packages[@]} -eq 0 ]] && [[ ${#installed_webapps[@]} -eq 0 ]]; then
-        echo -e "${GREEN}✓ No packages or webapps from the removal lists are currently installed.${NC}"
         echo ""
-        echo -e "${CYAN}Nothing to clean!${NC}"
+        gum style \
+            --foreground 82 \
+            --border rounded \
+            --border-foreground 82 \
+            --padding "1 2" \
+            --margin "1" \
+            "✓ System is clean!" \
+            "" \
+            "No removable packages or webapps found."
+        echo ""
         exit 0
     fi
     
-    # Display found items
-    local total_items=$((${#installed_packages[@]} + ${#installed_webapps[@]}))
-    echo -e "${YELLOW}Found ${total_items} item(s) that can be removed:${NC}"
-    echo ""
-    
-    if [[ ${#installed_packages[@]} -gt 0 ]]; then
-        echo -e "${BOLD}Apps found:${NC}"
-        for i in "${!installed_packages[@]}"; do
-            local num=$((i+1))
-            echo -e "  ${CYAN}[$num]${NC} ${installed_packages[$i]}"
-        done
-        echo ""
-    fi
-    
-    if [[ ${#installed_webapps[@]} -gt 0 ]]; then
-        echo -e "${BOLD}Webapps found:${NC}"
-        local start_num=$((${#installed_packages[@]} + 1))
-        for i in "${!installed_webapps[@]}"; do
-            local num=$((start_num + i))
-            echo -e "  ${CYAN}[$num]${NC} [WebApp] ${installed_webapps[$i]}"
-        done
-        echo ""
-    fi
-    
-    echo "Press Enter to continue to item selection, or Ctrl+C to exit..."
-    read </dev/tty
+    # Go directly to selection
     
     # Combine packages and webapps with separator
     local all_items=()
@@ -803,13 +815,14 @@ main() {
         all_items+=("${installed_webapps[@]}")
     fi
     
-    # Use simple text selection - call directly without capturing output
-    simple_select_packages "${all_items[@]}"
+    # Use enhanced selection menu
+    enhanced_select_packages "${all_items[@]}"
     local result=$?
     
     if [[ $result -ne 0 ]]; then
         clear
-        echo -e "\n${YELLOW}Operation cancelled.${NC}"
+        echo ""
+        gum log --level info "Operation cancelled"
         exit 0
     fi
     
@@ -817,9 +830,115 @@ main() {
     local selected_packages="$SELECTED_PACKAGES"
     local selected_webapps="$SELECTED_WEBAPPS"
     
-    # Convert to arrays and combine for removal
-    local packages_array=($selected_packages)
-    local webapps_array=($selected_webapps)
+    # Convert to arrays properly - these are space-separated strings from the selection function
+    local packages_array=()
+    local webapps_array=()
+    
+    # Parse space-separated strings into arrays
+    if [[ -n "$selected_packages" ]]; then
+        read -ra packages_array <<< "$selected_packages"
+    fi
+    
+    if [[ -n "$selected_webapps" ]]; then
+        read -ra webapps_array <<< "$selected_webapps"
+    fi
+    
+    # Check if any selected items have keyboard shortcuts
+    local selected_items_have_bindings=false
+    local total_bindings=0
+    
+    # Only check for bindings if the bindings file exists
+    if [[ -f "$BINDINGS_FILE" ]]; then
+        for pkg in "${packages_array[@]}"; do
+            local bindings=$(find_app_bindings "$pkg")
+            if [[ -n "$bindings" ]]; then
+                selected_items_have_bindings=true
+                total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
+            fi
+        done
+        
+        for webapp in "${webapps_array[@]}"; do
+            local bindings=$(find_app_bindings "$webapp")
+            if [[ -n "$bindings" ]]; then
+                selected_items_have_bindings=true
+                total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
+            fi
+        done
+    fi
+    
+    # Ask about keyboard shortcut cleanup if selected items have bindings
+    if [[ "$selected_items_have_bindings" == true ]]; then
+        clear
+        
+        gum style \
+            --border double \
+            --border-foreground 51 \
+            --padding "1 2" \
+            --width 60 \
+            --align center \
+            "⌨  KEYBOARD SHORTCUTS DETECTED"
+        
+        echo ""
+        
+        gum style \
+            --foreground 51 \
+            --bold \
+            "Found $total_bindings keyboard shortcut(s) for the selected items:"
+        
+        echo ""
+        
+        # Show items with bindings
+        for pkg in "${packages_array[@]}"; do
+            local bindings=$(find_app_bindings "$pkg")
+            if [[ -n "$bindings" ]]; then
+                gum style \
+                    --foreground 214 \
+                    "📦 $pkg"
+            fi
+        done
+        
+        for webapp in "${webapps_array[@]}"; do
+            local bindings=$(find_app_bindings "$webapp")
+            if [[ -n "$bindings" ]]; then
+                gum style \
+                    --foreground 214 \
+                    "🌐 $webapp"
+            fi
+        done
+        
+        echo ""
+        
+        gum style \
+            --foreground 51 \
+            --italic \
+            "Do you want to remove their keyboard shortcuts from ~/.config/hypr/bindings.conf?"
+        
+        gum style \
+            --foreground 240 \
+            --italic \
+            "(A backup will be created before making changes)"
+        
+        echo ""
+        
+        if gum confirm "Remove keyboard shortcuts?"; then
+            REMOVE_BINDINGS=true
+            gum style \
+                --foreground 82 \
+                "✓ Keyboard shortcuts will be removed"
+        else
+            REMOVE_BINDINGS=false
+            gum style \
+                --foreground 214 \
+                "✓ Keyboard shortcuts will be kept"
+        fi
+        
+        echo ""
+        gum style \
+            --foreground 240 \
+            --italic \
+            "Press Enter to continue..."
+        read </dev/tty
+    fi
     
     # Create combined array for removal function
     local items_to_remove=()
@@ -831,30 +950,59 @@ main() {
     
     # Final confirmation
     clear
-    echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║         Confirmation Required          ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${RED}${BOLD}Warning:${NC} You are about to remove the following items:"
+    
+    # Build confirmation content using separate lines
+    local total_count=$((${#packages_array[@]} + ${#webapps_array[@]}))
+    
+    # Show confirmation header
+    gum style \
+        --border double \
+        --border-foreground 196 \
+        --padding "1 2" \
+        --margin "1" \
+        --width 60 \
+        --align center \
+        "CONFIRMATION REQUIRED"
+    
     echo ""
     
+    gum style \
+        --bold \
+        "Ready to remove $total_count item(s):"
+    
+    echo ""
+    
+    # Show packages if any
     if [[ ${#packages_array[@]} -gt 0 ]]; then
-        echo -e "${BOLD}Packages:${NC}"
+        gum style \
+            --foreground 39 \
+            --bold \
+            "📦 Packages (${#packages_array[@]}):"
+        
         for pkg in "${packages_array[@]}"; do
-            echo -e "  ${BOLD}•${NC} $pkg"
+            gum style \
+                --foreground 214 \
+                "   • $pkg"
         done
         echo ""
     fi
     
+    # Show webapps if any
     if [[ ${#webapps_array[@]} -gt 0 ]]; then
-        echo -e "${BOLD}Webapps:${NC}"
+        gum style \
+            --foreground 39 \
+            --bold \
+            "🌐 Webapps (${#webapps_array[@]}):"
+        
         for webapp in "${webapps_array[@]}"; do
-            echo -e "  ${BOLD}•${NC} [WebApp] $webapp"
+            gum style \
+                --foreground 214 \
+                "   • $webapp"
         done
         echo ""
     fi
     
-    # Show if keyboard shortcuts will be removed
+    # Show keyboard shortcuts info if applicable
     if [[ "$REMOVE_BINDINGS" == true ]]; then
         local total_bindings=0
         for pkg in "${packages_array[@]}"; do
@@ -867,28 +1015,42 @@ main() {
         done
         
         if [[ $total_bindings -gt 0 ]]; then
-            echo -e "${CYAN}${BOLD}Also removing $total_bindings keyboard shortcut(s) from bindings.conf${NC}"
+            gum style \
+                --foreground 51 \
+                --bold \
+                "⌨  Also removing $total_bindings keyboard shortcut(s)"
             echo ""
         fi
     fi
     
-    echo -e "${YELLOW}This action cannot be undone.${NC}"
-    echo ""
-    read -p "Type 'yes' to confirm removal, or anything else to cancel: " confirm </dev/tty
+    # Show warning
+    gum style \
+        --foreground 196 \
+        --bold \
+        --italic \
+        "This action cannot be undone!"
     
-    if [[ "$confirm" == "yes" ]]; then
+    echo ""
+    
+    if gum confirm "Proceed with removal?"; then
         clear
         remove_items "${items_to_remove[@]}"
+        echo ""
+        gum style \
+            --foreground 82 \
+            --bold \
+            "✓ Cleanup complete!"
         echo ""
         echo "Press Enter to exit..."
         read </dev/tty
     else
-        echo -e "\n${YELLOW}Operation cancelled.${NC}"
+        echo ""
+        gum log --level info "Operation cancelled"
     fi
 }
 
 # Handle Ctrl+C gracefully
-trap 'echo -e "\n${YELLOW}Operation cancelled.${NC}"; exit 1' INT
+trap 'echo ""; gum log --level info "Operation cancelled"; exit 1' INT
 
 # Run main function
 main "$@"

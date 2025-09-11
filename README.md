@@ -27,14 +27,15 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 The script will:
 1. Check for installed packages and webapps from its removal lists
-2. Present a checklist where you can select which items to remove
-3. Display both regular apps and webapps in separate sections
-4. Show which items have associated keyboard shortcuts (marked with ⌨)
-5. Allow toggling keyboard shortcut cleanup on/off (press 'K' in selection menu)
-6. Ask for confirmation before removal
-7. Optionally remove keyboard shortcuts from `~/.config/hypr/bindings.conf`
-8. Request sudo privileges if needed for package removal
-9. Remove selected packages and webapps, showing the results
+2. Present the selection interface where you can:
+   - Select which applications and webapps to remove
+   - See which items have keyboard shortcuts (⌨)
+3. Display both regular apps and webapps with clear icons (📦/🌐)
+4. If selected items have keyboard shortcuts, ask if you want to remove them (YES/NO)
+5. Ask for final confirmation before removal
+6. Optionally remove keyboard shortcuts from `~/.config/hypr/bindings.conf`
+7. Request sudo privileges if needed for package removal
+8. Remove selected packages and webapps, showing the results
 
 ## Customizing the Lists
 
@@ -90,8 +91,9 @@ Simply uncomment or comment out items in these lists to customize what the clean
 The script can automatically detect and remove keyboard shortcuts associated with the apps and webapps you're removing. This feature:
 
 - Scans `~/.config/hypr/bindings.conf` for matching keyboard bindings
-- Shows a ⌨ indicator next to items that have associated shortcuts
-- Allows you to toggle the cleanup feature on/off with the 'K' key
+- Shows a ⌨ indicator next to items that have associated shortcuts during selection
+- After app selection, presents a YES/NO dialog for items with keyboard shortcuts
+- Shows exactly which items have shortcuts before asking for confirmation
 - Creates a timestamped backup of your bindings.conf before making changes
 - Intelligently matches bindings for:
   - Regular applications (e.g., `uwsm app -- spotify`)

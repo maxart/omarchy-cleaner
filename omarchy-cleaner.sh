@@ -399,9 +399,9 @@ simple_select_packages() {
         done
     fi
     
-    # Initialize all as selected and check for bindings
+    # Initialize all as unselected and check for bindings
     for i in "${!all_items[@]}"; do
-        selected_status[$i]=1
+        selected_status[$i]=0
         # Check if this item has keyboard bindings
         local item_bindings=$(find_app_bindings "${all_items[$i]}")
         if [[ -n "$item_bindings" ]]; then
@@ -832,7 +832,7 @@ main() {
     # Final confirmation
     clear
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║       Confirmation Required             ║${NC}"
+    echo -e "${BLUE}║         Confirmation Required          ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${RED}${BOLD}Warning:${NC} You are about to remove the following items:"

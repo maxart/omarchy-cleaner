@@ -958,6 +958,9 @@ main() {
     gum style \
         --border double \
         --border-foreground 196 \
+        --background 52 \
+        --foreground 15 \
+        --bold \
         --padding "1 2" \
         --margin "1" \
         --width 60 \
@@ -1023,16 +1026,13 @@ main() {
         fi
     fi
     
-    # Show warning
-    gum style \
-        --foreground 196 \
-        --bold \
-        --italic \
-        "This action cannot be undone!"
-    
     echo ""
     
-    if gum confirm "Proceed with removal?"; then
+    # Show confirmation prompt with integrated warning
+    echo "Proceed with removal? $(gum style --foreground 240 --italic "(This action cannot be undone!)")"
+    echo ""
+    
+    if gum confirm; then
         clear
         remove_items "${items_to_remove[@]}"
         echo ""

@@ -19,7 +19,6 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 - **Interactive Text Interface**: Clean, colorful text-based UI with item selection
 - **Dual Removal**: Removes both regular packages (via pacman) and webapps (via omarchy-webapp-remove)
-- **Selective Removal**: Choose which applications and webapps to remove using number keys
 - **Keyboard Shortcut Cleanup**: Optionally remove associated keyboard shortcuts from `~/.config/hypr/bindings.conf`
 - **Safe Operation**: Multiple confirmation steps before removing packages
 

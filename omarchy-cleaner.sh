@@ -530,8 +530,9 @@ enhanced_select_packages() {
         done
     done <<< "$selected_items"
     
-    SELECTED_PACKAGES="${selected_packages[*]}"
-    SELECTED_WEBAPPS="${selected_webapps[*]}"
+    # Use newline-delimited strings to preserve items with spaces
+    SELECTED_PACKAGES=$(printf '%s\n' "${selected_packages[@]}")
+    SELECTED_WEBAPPS=$(printf '%s\n' "${selected_webapps[@]}")
     return 0
 }
 
@@ -834,13 +835,13 @@ main() {
     local packages_array=()
     local webapps_array=()
     
-    # Parse space-separated strings into arrays
+    # Parse newline-delimited strings into arrays
     if [[ -n "$selected_packages" ]]; then
-        read -ra packages_array <<< "$selected_packages"
+        readarray -t packages_array <<< "$selected_packages"
     fi
     
     if [[ -n "$selected_webapps" ]]; then
-        read -ra webapps_array <<< "$selected_webapps"
+        readarray -t webapps_array <<< "$selected_webapps"
     fi
     
     # Check if any selected items have keyboard shortcuts

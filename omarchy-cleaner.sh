@@ -441,7 +441,7 @@ enhanced_select_packages() {
         echo ""
 
         gum style \
-            --border-foreground 39 \
+            --foreground 237 \
             "═════════════════════════════════════════════════"
         
         echo ""

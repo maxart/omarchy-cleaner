@@ -603,6 +603,9 @@ remove_webapps() {
     if [[ ${#failed_webapps[@]} -gt 0 ]]; then
         gum style --foreground 214 "Could not remove: ${failed_webapps[*]}"
     fi
+
+    # Return the number of failed webapps as exit code
+    return ${#failed_webapps[@]}
 }
 
 # Function to remove packages
@@ -621,6 +624,16 @@ remove_packages() {
         --bold \
         "📦 Removing ${#packages[@]} package(s)..."
     echo ""
+
+    # Ensure we have sudo credentials before starting
+    if ! sudo -n true 2>/dev/null; then
+        gum style --foreground 214 "🔐 Administrator privileges required for package removal"
+        if ! sudo true; then
+            gum log --level error "Failed to obtain sudo privileges"
+            return 1
+        fi
+        echo ""
+    fi
     
     local current=0
     local total=${#packages[@]}
@@ -631,7 +644,7 @@ remove_packages() {
         # Show current progress
         gum style --foreground 51 "[$current/$total] Processing: $pkg"
         
-        if gum spin --spinner dot --title "Removing $pkg..." -- sudo pacman -Rns --noconfirm "$pkg" 2>/dev/null; then
+        if gum spin --spinner dot --title "Removing $pkg..." -- bash -c "sudo pacman -Rns --noconfirm '$pkg' 2>/dev/null"; then
             gum log --level info "✓ Removed: $pkg"
             removed_packages+=("$pkg")
         else
@@ -659,6 +672,9 @@ remove_packages() {
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
         gum style --foreground 214 "Could not remove: ${failed_packages[*]}"
     fi
+
+    # Return the number of failed packages as exit code
+    return ${#failed_packages[@]}
 }
 
 # Function to remove both packages and webapps
@@ -732,23 +748,20 @@ remove_items() {
         
         # Track package removal results
         total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]}))
-        remove_packages "${pkg_array[@]}"
-        # Count failed packages by checking what was actually installed vs attempted
-        local pkg_failures=0
-        for pkg in "${pkg_array[@]}"; do
-            if is_package_installed "$pkg"; then
-                ((pkg_failures++))
-            fi
-        done
 
-        remove_webapps "${webapp_array[@]}"
-        # Count failed webapps
+        # Remove packages and capture failure count
+        local pkg_failures=0
+        if [[ ${#pkg_array[@]} -gt 0 ]]; then
+            remove_packages "${pkg_array[@]}"
+            pkg_failures=$?
+        fi
+
+        # Remove webapps and capture failure count
         local webapp_failures=0
-        for webapp in "${webapp_array[@]}"; do
-            if is_webapp_installed "$webapp"; then
-                ((webapp_failures++))
-            fi
-        done
+        if [[ ${#webapp_array[@]} -gt 0 ]]; then
+            remove_webapps "${webapp_array[@]}"
+            webapp_failures=$?
+        fi
 
         total_failed=$((pkg_failures + webapp_failures))
     else
@@ -783,14 +796,7 @@ remove_items() {
         # Track package removal results
         total_attempted=${#packages[@]}
         remove_packages "${packages[@]}"
-        # Count failed packages
-        local pkg_failures=0
-        for pkg in "${packages[@]}"; do
-            if is_package_installed "$pkg"; then
-                ((pkg_failures++))
-            fi
-        done
-        total_failed=$pkg_failures
+        total_failed=$?
     fi
     
     # Hero-style completion summary

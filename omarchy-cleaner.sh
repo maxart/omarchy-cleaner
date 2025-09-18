@@ -423,13 +423,23 @@ enhanced_select_packages() {
         # Show header with style
         clear
         gum style \
-            --border double \
-            --border-foreground 39 \
-            --padding "1 2" \
-            --width 50 \
+            --foreground 39 \
             --align center \
-            "Omarchy Cleaner v$VERSION" \
-            "Remove unwanted default applications"
+            "   ____                            __         " \
+            "  / __ \____ ___  ____ ___________/ /_  __  __" \
+            " / / / / __ \`__ \/ __ \`/ ___/ ___/ __ \/ / / /" \
+            "/ /_/ / / / / / / /_/ / /  / /__/ / / / /_/ / " \
+            "\____/_/_/_/_/_/\__,_/_/   \___/_/ /_/\__, /  " \
+            "      / ____/ /__  ____ _____  ___  _/____/   " \
+            "     / /   / / _ \/ __ \`/ __ \/ _ \/ ___/     " \
+            "    / /___/ /  __/ /_/ / / / /  __/ /         " \
+            "    \____/_/\___/\__,_/_/ /_/\___/_/          "
+
+        echo ""
+
+        gum style \
+            --border-foreground 39 \
+            "═════════════════════════════════════════════════"
         
         echo ""
         
@@ -653,6 +663,10 @@ remove_items() {
     local packages=("$@")
     local webapps=()
     local all_bindings_to_remove=()
+
+    # Global success tracking
+    local total_attempted=0
+    local total_failed=0
     
     # Parse arguments - find separator
     local separator_index=-1
@@ -713,8 +727,27 @@ remove_items() {
             fi
         fi
         
+        # Track package removal results
+        total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]}))
         remove_packages "${pkg_array[@]}"
+        # Count failed packages by checking what was actually installed vs attempted
+        local pkg_failures=0
+        for pkg in "${pkg_array[@]}"; do
+            if is_package_installed "$pkg"; then
+                ((pkg_failures++))
+            fi
+        done
+
         remove_webapps "${webapp_array[@]}"
+        # Count failed webapps
+        local webapp_failures=0
+        for webapp in "${webapp_array[@]}"; do
+            if is_webapp_installed "$webapp"; then
+                ((webapp_failures++))
+            fi
+        done
+
+        total_failed=$((pkg_failures + webapp_failures))
     else
         # All are packages
         # Collect bindings to remove if enabled
@@ -743,40 +776,103 @@ remove_items() {
                 gum log --level info "No keyboard shortcuts found"
             fi
         fi
-        
+
+        # Track package removal results
+        total_attempted=${#packages[@]}
         remove_packages "${packages[@]}"
+        # Count failed packages
+        local pkg_failures=0
+        for pkg in "${packages[@]}"; do
+            if is_package_installed "$pkg"; then
+                ((pkg_failures++))
+            fi
+        done
+        total_failed=$pkg_failures
     fi
     
-    # Final summary
+    # Hero-style completion summary
     echo ""
-    gum style \
-        --border double \
-        --border-foreground 82 \
-        --padding "1 2" \
-        --margin "1" \
-        --align center \
-        "✓ Removal process completed!"
+    local successful_count=$((total_attempted - total_failed))
+
+    if [[ $total_failed -eq 0 ]]; then
+        # All successful - green hero
+        gum style \
+            --border double \
+            --border-foreground 82 \
+            --background 22 \
+            --foreground 15 \
+            --bold \
+            --padding "1 2" \
+            --margin "1" \
+            --width 60 \
+            --align center \
+            "✅ SUCCESS" \
+            "" \
+            "All $total_attempted item(s) removed successfully!"
+
+        # Return success
+        return 0
+    elif [[ $successful_count -gt 0 ]]; then
+        # Partial success - orange hero
+        gum style \
+            --border double \
+            --border-foreground 214 \
+            --background 94 \
+            --foreground 15 \
+            --bold \
+            --padding "1 2" \
+            --margin "1" \
+            --width 60 \
+            --align center \
+            "⚠️  PARTIAL SUCCESS" \
+            "" \
+            "$successful_count of $total_attempted item(s) removed" \
+            "$total_failed item(s) could not be removed" \
+            "" \
+            "Some items may have dependencies"
+
+        # Return partial failure
+        return 1
+    else
+        # All failed - red hero
+        gum style \
+            --border double \
+            --border-foreground 196 \
+            --background 52 \
+            --foreground 15 \
+            --bold \
+            --padding "1 2" \
+            --margin "1" \
+            --width 60 \
+            --align center \
+            "❌ FAILED" \
+            "" \
+            "Could not remove any items" \
+            "" \
+            "Check dependencies and permissions"
+
+        # Return failure
+        return 2
+    fi
 }
 
 # Main function
 main() {
     clear
     
-    # Show stylish welcome banner
+    # Show ASCII logo
     gum style \
-        --border double \
-        --border-foreground 39 \
-        --margin "1" \
-        --padding "1 2" \
-        --width 60 \
-        --align center \
-        --bold \
-        "OMARCHY CLEANER" \
-        "" \
-        "Version $VERSION" \
-        "" \
-        "If Omarchy is the omakase of Linux distros," \
-        "this is your trusty pair of chopsticks 🥢"
+        --foreground 39 \
+        "   ____                            __         " \
+        "  / __ \____ ___  ____ ___________/ /_  __  __" \
+        " / / / / __ \`__ \/ __ \`/ ___/ ___/ __ \/ / / /" \
+        "/ /_/ / / / / / / /_/ / /  / /__/ / / / /_/ / " \
+        "\____/_/_/_/_/_/\__,_/_/   \___/_/ /_/\__, /  " \
+        "      / ____/ /__  ____ _____  ___  _/____/   " \
+        "     / /   / / _ \/ __ \`/ __ \/ _ \/ ___/     " \
+        "    / /___/ /  __/ /_/ / / / /  __/ /         " \
+        "    \____/_/\___/\__,_/_/ /_/\___/_/          " \
+        "                                              "
     
     echo ""
     
@@ -1036,11 +1132,6 @@ main() {
     if gum confirm; then
         clear
         remove_items "${items_to_remove[@]}"
-        echo ""
-        gum style \
-            --foreground 82 \
-            --bold \
-            "✓ Cleanup complete!"
         echo ""
         echo "Press Enter to exit..."
         read </dev/tty

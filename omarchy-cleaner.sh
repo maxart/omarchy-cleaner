@@ -4,14 +4,23 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="2.0"
+VERSION="2.1"
 
 # Configuration
-BINDINGS_FILE="$HOME/.config/hypr/bindings.conf"
+# Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
+# user has (prefer the current .lua format, fall back to legacy .conf).
+BINDINGS_FILE=""
+for candidate in "$HOME/.config/hypr/bindings.lua" "$HOME/.config/hypr/bindings.conf"; do
+    if [[ -f "$candidate" ]]; then
+        BINDINGS_FILE="$candidate"
+        break
+    fi
+done
 REMOVE_BINDINGS=false
 
 # App
-# List from: https://github.com/basecamp/omarchy/blob/master/install/packages.sh
+# List from: https://github.com/basecamp/omarchy/blob/master/install/omarchy-base.packages
+# Apps Omarchy itself offers to drop live in: bin/omarchy-remove-preinstalls
 DEFAULT_APPS=(
     # Packages offered for removal
     "1password-beta"
@@ -21,22 +30,29 @@ DEFAULT_APPS=(
     "localsend"
     "obs-studio"
     "obsidian"
-    "omarchy-chromium"
+    "chromium"
     "signal-desktop"
     "spotify"
     "xournalpp"
     "docker"
     "docker-buildx"
     "docker-compose"
-    "ghostty"
     "gpu-screen-recorder"
-    "opencode"
-    
+    "claude-code"
+    "cliamp"
+    "typora"
+    "pinta"
+    "lazydocker"
+
     "aether"
+
+    # Terminals from older Omarchy versions (current default is foot).
+    # Only offered if actually installed; remove only if you use another terminal.
+    "ghostty"
+    "alacritty"
 
     # Uncomment to include in removal list
     # "asdcontrol-git"
-    # "alacritty"
     # "avahi"
     # "bash-completion"
     # "bat"
@@ -88,7 +104,6 @@ DEFAULT_APPS=(
     # "iwd"
     # "jq"
     # "kvantum-qt5"
-    # "lazydocker"
     # "lazygit"
     # "less"
     # "libqalculate"
@@ -111,7 +126,6 @@ DEFAULT_APPS=(
     # "omarchy-nvim"
     # "omarchy-walker"
     # "pamixer"
-    # "pinta"
     # "playerctl"
     # "plocate"
     # "plymouth"
@@ -139,7 +153,6 @@ DEFAULT_APPS=(
     # "ttf-cascadia-mono-nerd"
     # "ttf-ia-writer"
     # "ttf-jetbrains-mono-nerd"
-    # "typora"
     # "tzupdate"
     # "ufw"
     # "ufw-docker"
@@ -183,6 +196,22 @@ DEFAULT_WEBAPPS=(
     "Zoom"
 )
 
+# NPM CLI tools
+# List from: https://github.com/basecamp/omarchy/blob/master/install/packaging/npm.sh
+# These are installed as `pnpm dlx` wrapper stubs in ~/.local/bin (not pacman),
+# so they are removed by deleting the stub. Omarchy's own remove-preinstalls
+# drops codex/gemini/copilot/opencode/playwright-cli/pi; we offer the full set.
+DEFAULT_NPM_CLIS=(
+    "codex"
+    "gemini"
+    "copilot"
+    "opencode"
+    "playwright-cli"
+    "pi"
+    "ghui"
+    "hunk"
+)
+
 # Function to check if package is installed
 is_package_installed() {
     local package="$1"
@@ -197,6 +226,16 @@ is_webapp_installed() {
     local desktop_file="$HOME/.local/share/applications/$webapp.desktop"
     [[ -f "$desktop_file" ]]
     return $?
+}
+
+# Function to check if an npm CLI tool is installed
+is_npm_cli_installed() {
+    local cmd="$1"
+    local stub="$HOME/.local/bin/$cmd"
+    [[ -f "$stub" ]] || return 1
+    # Only treat Omarchy-generated pnpm dlx wrappers as removable, so we never
+    # delete an unrelated binary the user dropped in ~/.local/bin.
+    grep -q "pnpm dlx" "$stub" 2>/dev/null
 }
 
 # Function to get list of installed packages from our removal list
@@ -217,120 +256,133 @@ get_installed_webapps() {
     done
 }
 
-# Function to find keyboard bindings for an app/webapp
+# Function to get list of installed npm CLI tools from our removal list
+get_installed_npm_clis() {
+    for cli in "${DEFAULT_NPM_CLIS[@]}"; do
+        if is_npm_cli_installed "$cli"; then
+            echo "$cli"
+        fi
+    done
+}
+
+# Splits a combined "items + sentinel sections" array into globals.
+# Layout: packages, then optional "--webapps--" section, then optional
+# "--npmclis--" section. Used by both the selector and the remover.
+parse_sections() {
+    PARSED_PACKAGES=()
+    PARSED_WEBAPPS=()
+    PARSED_NPMCLIS=()
+    local section="package"
+    local item
+    for item in "$@"; do
+        case "$item" in
+            "--webapps--") section="webapp"; continue ;;
+            "--npmclis--") section="npmcli"; continue ;;
+        esac
+        case "$section" in
+            package) PARSED_PACKAGES+=("$item") ;;
+            webapp)  PARSED_WEBAPPS+=("$item") ;;
+            npmcli)  PARSED_NPMCLIS+=("$item") ;;
+        esac
+    done
+}
+
+# Map a webapp name to the URL domain(s) that identify its binding.
+webapp_domains_for() {
+    case "$1" in
+        "hey")             echo "app.hey.com|hey.com" ;;
+        "basecamp")        echo "basecamp.com|37signals.com|launchpad" ;;
+        "whatsapp")        echo "web.whatsapp.com|whatsapp.com" ;;
+        "google photos")   echo "photos.google.com" ;;
+        "google contacts") echo "contacts.google.com" ;;
+        "google messages") echo "messages.google.com" ;;
+        "chatgpt")         echo "chatgpt.com|chat.openai.com" ;;
+        "youtube")         echo "youtube.com|youtu.be" ;;
+        "github")          echo "github.com" ;;
+        "x")               echo "x.com|twitter.com" ;;
+        "figma")           echo "figma.com" ;;
+        "discord")         echo "discord.com|discord.gg" ;;
+        "fizzy")           echo "app.fizzy.do|fizzy.do" ;;
+        "google maps")     echo "maps.google.com" ;;
+        "zoom")            echo "zoom.us|zoom.com" ;;
+        *)                 echo "" ;;
+    esac
+}
+
+# Map a package name to the token(s) its keybinding references. Packages and
+# their launch tokens don't always match (1password-beta -> 1password), and
+# docker tooling is bound via lazydocker.
+app_tokens_for() {
+    case "$1" in
+        1password-beta|1password-cli)     echo "1password" ;;
+        docker|docker-buildx|docker-compose) echo "docker lazydocker" ;;
+        *)                                 echo "$1" ;;
+    esac
+}
+
+# Function to find keyboard bindings for an app/webapp.
+# Handles both the current Lua format (o.bind("...", "...", { launch = "app" }))
+# and the legacy bindings.conf format (bindd = ..., exec, uwsm-app -- app).
 find_app_bindings() {
     local app_name="$1"
     local bindings=()
-    
+
     if [[ ! -f "$BINDINGS_FILE" ]]; then
         echo ""
         return
     fi
-    
-    # Convert app name to lowercase for case-insensitive matching
-    local app_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
-    
-    # Define webapp URL patterns for known webapps
-    local webapp_domains=""
-    case "$app_lower" in
-        "hey")
-            webapp_domains="app.hey.com|hey.com"
-            ;;
-        "basecamp")
-            webapp_domains="basecamp.com|3.basecamp.com"
-            ;;
-        "whatsapp")
-            webapp_domains="web.whatsapp.com|whatsapp.com"
-            ;;
-        "google photos")
-            webapp_domains="photos.google.com"
-            ;;
-        "google contacts")
-            webapp_domains="contacts.google.com"
-            ;;
-        "google messages")
-            webapp_domains="messages.google.com"
-            ;;
-        "chatgpt")
-            webapp_domains="chatgpt.com|chat.openai.com"
-            ;;
-        "youtube")
-            webapp_domains="youtube.com|youtu.be"
-            ;;
-        "github")
-            webapp_domains="github.com"
-            ;;
-        "x")
-            webapp_domains="x.com|twitter.com"
-            ;;
-        "figma")
-            webapp_domains="figma.com"
-            ;;
-        "discord")
-            webapp_domains="discord.com|discord.gg"
-            ;;
-        "fizzy")
-            webapp_domains="app.fizzy.do|fizzy.do"
-            ;;
-        "google maps")
-            webapp_domains="maps.google.com"
-            ;;
-        "zoom")
-            webapp_domains="zoom.us|zoom.com"
-            ;;
-    esac
-    
-    # Read the bindings file and find matching lines
+
+    local app_lower
+    app_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
+
+    local webapp_domains
+    webapp_domains=$(webapp_domains_for "$app_lower")
+
+    local -a tokens
+    read -r -a tokens <<< "$(app_tokens_for "$app_lower")"
+
     while IFS= read -r line; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        # Skip blanks and comments (.conf '#' and .lua '--')
         [[ -z "${line// }" ]] && continue
-        
-        # Check if this is a bindd line
-        if [[ "$line" =~ ^bindd[[:space:]]*= ]]; then
-            local line_lower=$(echo "$line" | tr '[:upper:]' '[:lower:]')
-            
-            # Check for app matches in various formats
-            # Direct app name match (e.g., "spotify", "obsidian", "signal-desktop")
-            if [[ "$line_lower" =~ uwsm[[:space:]]+app[[:space:]]+--[[:space:]]+$app_lower([[:space:]]|$) ]]; then
-                bindings+=("$line")
-            # Terminal app match (e.g., "btop", "lazydocker", "nvim")
-            elif [[ "$line_lower" =~ \$terminal[[:space:]]+-e[[:space:]]+$app_lower([[:space:]]|$) ]]; then
-                bindings+=("$line")
-            # Webapp match - check by URL domain if defined
-            elif [[ "$line_lower" =~ omarchy-launch-webapp ]]; then
-                if [[ -n "$webapp_domains" ]]; then
-                    # Extract URL from the line
-                    if [[ "$line" =~ omarchy-launch-webapp[[:space:]]+\"([^\"]+)\" ]]; then
-                        local url="${BASH_REMATCH[1]}"
-                        # Check if URL matches any of the webapp domains
-                        if [[ "$url" =~ ($webapp_domains) ]]; then
-                            bindings+=("$line")
-                        fi
-                    fi
-                else
-                    # Fallback to label matching for unknown webapps
-                    if [[ "$line" =~ ,[[:space:]]*([^,]+),[[:space:]]*exec ]]; then
-                        local label=$(echo "$line" | sed -n 's/.*,[[:space:]]*\([^,]*\),[[:space:]]*exec.*/\1/p' | xargs)
-                        local label_lower=$(echo "$label" | tr '[:upper:]' '[:lower:]')
-                        if [[ "$label_lower" == "$app_lower" ]]; then
-                            bindings+=("$line")
-                        fi
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*-- ]] && continue
+
+        # Only consider actual binding lines in either format
+        [[ "$line" =~ ^[[:space:]]*bindd[[:space:]]*= ]] || [[ "$line" =~ o\.bind\( ]] || continue
+
+        local line_lower
+        line_lower=$(echo "$line" | tr '[:upper:]' '[:lower:]')
+
+        if [[ -n "$webapp_domains" ]]; then
+            # Webapp: the line must invoke a webapp launcher (.conf command or
+            # .lua `webapp =`) AND reference a URL on a matching domain.
+            if [[ "$line_lower" =~ (omarchy-launch-webapp|omarchy-launch-or-focus-webapp|webapp[[:space:]]*=) ]]; then
+                if [[ "$line" =~ (https?://[^\"\ ]+) ]]; then
+                    local url="${BASH_REMATCH[1]}"
+                    if [[ "$url" =~ ($webapp_domains) ]]; then
+                        bindings+=("$line")
                     fi
                 fi
-            # Docker special case
-            elif [[ "$app_lower" == "docker" ]] && [[ "$line_lower" =~ (docker|lazydocker) ]]; then
-                bindings+=("$line")
-            # 1password special cases
-            elif [[ "$app_lower" == "1password-beta" || "$app_lower" == "1password-cli" ]] && [[ "$line_lower" =~ 1password ]]; then
-                bindings+=("$line")
-            # Nautilus (File manager)
-            elif [[ "$app_lower" == "nautilus" ]] && [[ "$line_lower" =~ nautilus ]]; then
-                bindings+=("$line")
             fi
+        else
+            # Native app: match a launcher verb followed by one of the tokens,
+            # across both config formats.
+            local tok
+            for tok in "${tokens[@]}"; do
+                local boundary="([\"[:space:]]|\$)"
+                if [[ "$line_lower" =~ (launch|tui)[[:space:]]*=[[:space:]]*\"$tok$boundary ]] \
+                   || [[ "$line_lower" =~ or-focus[[:space:]]+$tok$boundary ]] \
+                   || [[ "$line_lower" =~ omarchy-launch-tui[[:space:]]+$tok$boundary ]] \
+                   || [[ "$line_lower" =~ omarchy-launch-or-focus-tui[[:space:]]+$tok$boundary ]] \
+                   || [[ "$line_lower" =~ uwsm[-[:space:]]+app[[:space:]]+--[[:space:]]+$tok$boundary ]] \
+                   || [[ "$line_lower" =~ \$terminal[[:space:]]+-e[[:space:]]+$tok$boundary ]]; then
+                    bindings+=("$line")
+                    break
+                fi
+            done
         fi
     done < "$BINDINGS_FILE"
-    
+
     # Return unique bindings
     printf '%s\n' "${bindings[@]}" | sort -u
 }
@@ -392,44 +444,36 @@ enhanced_select_packages() {
     local display_items=()
     local bindings_found=()
     
-    # Parse arguments - first determine where packages end and webapps begin
-    local separator_index=-1
-    for i in "${!installed_packages[@]}"; do
-        if [[ "${installed_packages[$i]}" == "--webapps--" ]]; then
-            separator_index=$i
-            break
-        fi
+    # Split the combined argument list (packages, --webapps--, --npmclis--) into
+    # typed items.
+    parse_sections "${installed_packages[@]}"
+    for item in "${PARSED_PACKAGES[@]}"; do
+        all_items+=("$item")
+        item_types+=("package")
     done
-    
-    if [[ $separator_index -ge 0 ]]; then
-        # Split into packages and webapps
-        for ((i=0; i<separator_index; i++)); do
-            all_items+=("${installed_packages[$i]}")
-            item_types+=("package")
-        done
-        for ((i=separator_index+1; i<${#installed_packages[@]}; i++)); do
-            all_items+=("${installed_packages[$i]}")
-            item_types+=("webapp")
-        done
-    else
-        # All are packages
-        for item in "${installed_packages[@]}"; do
-            all_items+=("$item")
-            item_types+=("package")
-        done
-    fi
-    
+    for item in "${PARSED_WEBAPPS[@]}"; do
+        all_items+=("$item")
+        item_types+=("webapp")
+    done
+    for item in "${PARSED_NPMCLIS[@]}"; do
+        all_items+=("$item")
+        item_types+=("npmcli")
+    done
+
     # Build display items with type indicators and binding markers
     for i in "${!all_items[@]}"; do
         local prefix=""
-        if [[ "${item_types[$i]}" == "webapp" ]]; then
-            prefix="🌐 "
-        else
-            prefix="📦 "
+        case "${item_types[$i]}" in
+            webapp) prefix="🌐 " ;;
+            npmcli) prefix="⬢ " ;;
+            *)      prefix="📦 " ;;
+        esac
+
+        # Check if this item has keyboard bindings (npm CLIs have none)
+        local item_bindings=""
+        if [[ "${item_types[$i]}" != "npmcli" ]]; then
+            item_bindings=$(find_app_bindings "${all_items[$i]}")
         fi
-        
-        # Check if this item has keyboard bindings
-        local item_bindings=$(find_app_bindings "${all_items[$i]}")
         if [[ -n "$item_bindings" ]]; then
             bindings_found[$i]=1
             display_items+=("${prefix}${all_items[$i]} ⌨")
@@ -473,18 +517,23 @@ enhanced_select_packages() {
         # Show item counts
         local pkg_count=0
         local webapp_count=0
+        local npm_count=0
         for type in "${item_types[@]}"; do
-            if [[ "$type" == "package" ]]; then
-                ((pkg_count++))
-            else
-                ((webapp_count++))
-            fi
+            case "$type" in
+                package) ((pkg_count++)) ;;
+                webapp)  ((webapp_count++)) ;;
+                npmcli)  ((npm_count++)) ;;
+            esac
         done
-        
+
+        local counts_msg="Found $pkg_count packages and $webapp_count webapps"
+        if [[ $npm_count -gt 0 ]]; then
+            counts_msg="$counts_msg and $npm_count npm CLI tools"
+        fi
         gum style \
             --foreground 214 \
             --bold \
-            "Found $pkg_count packages and $webapp_count webapps"
+            "$counts_msg"
         
         echo ""
     }
@@ -549,27 +598,29 @@ enhanced_select_packages() {
     # Parse selected items back to original names
     local selected_packages=()
     local selected_webapps=()
-    
+    local selected_npmclis=()
+
     while IFS= read -r selected_item; do
-        # Remove emoji prefix (📦 or 🌐) and keyboard marker (⌨)
-        local clean_item=$(echo "$selected_item" | sed 's/^[📦🌐] //' | sed 's/ ⌨$//')
-        
+        # Remove emoji prefix (📦/🌐/⬢) and keyboard marker (⌨)
+        local clean_item=$(echo "$selected_item" | sed 's/^[📦🌐⬢] //' | sed 's/ ⌨$//')
+
         # Find matching item in original arrays
         for i in "${!all_items[@]}"; do
             if [[ "${all_items[$i]}" == "$clean_item" ]]; then
-                if [[ "${item_types[$i]}" == "webapp" ]]; then
-                    selected_webapps+=("$clean_item")
-                else
-                    selected_packages+=("$clean_item")
-                fi
+                case "${item_types[$i]}" in
+                    webapp) selected_webapps+=("$clean_item") ;;
+                    npmcli) selected_npmclis+=("$clean_item") ;;
+                    *)      selected_packages+=("$clean_item") ;;
+                esac
                 break
             fi
         done
     done <<< "$selected_items"
-    
+
     # Use newline-delimited strings to preserve items with spaces
     SELECTED_PACKAGES=$(printf '%s\n' "${selected_packages[@]}")
     SELECTED_WEBAPPS=$(printf '%s\n' "${selected_webapps[@]}")
+    SELECTED_NPMCLIS=$(printf '%s\n' "${selected_npmclis[@]}")
     return 0
 }
 
@@ -630,6 +681,66 @@ remove_webapps() {
 
     # Return the number of failed webapps as exit code
     return ${#failed_webapps[@]}
+}
+
+# Function to remove npm CLI tools (pnpm dlx wrapper stubs in ~/.local/bin)
+remove_npm_clis() {
+    local clis=("$@")
+    local failed_clis=()
+    local removed_clis=()
+
+    if [[ ${#clis[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    echo ""
+    gum style \
+        --foreground 39 \
+        --bold \
+        "⬢ Removing ${#clis[@]} npm CLI tool(s)..."
+    echo ""
+
+    local current=0
+    local total=${#clis[@]}
+
+    for cli in "${clis[@]}"; do
+        ((current++))
+
+        # Show current progress
+        gum style --foreground 51 "[$current/$total] Processing: $cli"
+
+        # These are unprivileged stubs in the user's home; no sudo needed.
+        if gum spin --spinner dot --title "Removing $cli..." -- bash -c "rm -f '$HOME/.local/bin/$cli'"; then
+            gum log --level info "✓ Removed: $cli"
+            removed_clis+=("$cli")
+        else
+            gum log --level error "✗ Failed: $cli"
+            failed_clis+=("$cli")
+        fi
+
+        # Show progress bar
+        local percentage=$(( (current * 100) / total ))
+        local filled=$(( percentage / 5 ))
+        local empty=$(( (100 - percentage) / 5 ))
+
+        printf "Progress: "
+        printf '\033[92m█%.0s\033[0m' $(seq 1 $filled)
+        printf '\033[90m░%.0s\033[0m' $(seq 1 $empty)
+        printf " %d%% (%d/%d)\n" "$percentage" "$current" "$total"
+        echo ""
+    done
+
+    # Summary for npm CLIs
+    echo ""
+    if [[ ${#removed_clis[@]} -gt 0 ]]; then
+        gum style --foreground 82 "Successfully removed: ${removed_clis[*]}"
+    fi
+    if [[ ${#failed_clis[@]} -gt 0 ]]; then
+        gum style --foreground 214 "Could not remove: ${failed_clis[*]}"
+    fi
+
+    # Return the number of failed CLIs as exit code
+    return ${#failed_clis[@]}
 }
 
 # Function to remove packages
@@ -703,126 +814,69 @@ remove_packages() {
 
 # Function to remove both packages and webapps
 remove_items() {
-    local packages=("$@")
-    local webapps=()
     local all_bindings_to_remove=()
 
     # Global success tracking
     local total_attempted=0
     local total_failed=0
-    
-    # Parse arguments - find separator
-    local separator_index=-1
-    for i in "${!packages[@]}"; do
-        if [[ "${packages[$i]}" == "--webapps--" ]]; then
-            separator_index=$i
-            break
-        fi
-    done
-    
-    if [[ $separator_index -ge 0 ]]; then
-        # Split into packages and webapps arrays
-        local pkg_array=()
-        local webapp_array=()
-        
-        for ((i=0; i<separator_index; i++)); do
-            pkg_array+=("${packages[$i]}")
-        done
-        for ((i=separator_index+1; i<${#packages[@]}; i++)); do
-            webapp_array+=("${packages[$i]}")
-        done
-        
-        # Collect bindings to remove if enabled
-        if [[ "$REMOVE_BINDINGS" == true ]]; then
-            echo ""
-            gum style --foreground 51 "Checking for keyboard shortcuts..."
-            
-            for pkg in "${pkg_array[@]}"; do
-                local pkg_bindings=$(find_app_bindings "$pkg")
-                if [[ -n "$pkg_bindings" ]]; then
-                    while IFS= read -r binding; do
-                        if [[ -n "$binding" ]]; then
-                            all_bindings_to_remove+=("$binding")
-                        fi
-                    done <<< "$pkg_bindings"
-                fi
-            done
-            
-            for webapp in "${webapp_array[@]}"; do
-                local webapp_bindings=$(find_app_bindings "$webapp")
-                if [[ -n "$webapp_bindings" ]]; then
-                    while IFS= read -r binding; do
-                        if [[ -n "$binding" ]]; then
-                            all_bindings_to_remove+=("$binding")
-                        fi
-                    done <<< "$webapp_bindings"
-                fi
-            done
-            
-            # Remove bindings first
-            if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
-                echo ""
-                gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
-                remove_bindings_from_file "${all_bindings_to_remove[@]}"
-            else
-                echo ""
-                gum log --level info "No keyboard shortcuts found"
+
+    # Split combined list into packages / webapps / npm CLIs
+    parse_sections "$@"
+    local pkg_array=("${PARSED_PACKAGES[@]}")
+    local webapp_array=("${PARSED_WEBAPPS[@]}")
+    local npmcli_array=("${PARSED_NPMCLIS[@]}")
+
+    # Collect and remove keyboard shortcuts first (npm CLIs have none)
+    if [[ "$REMOVE_BINDINGS" == true ]]; then
+        echo ""
+        gum style --foreground 51 "Checking for keyboard shortcuts..."
+
+        for item in "${pkg_array[@]}" "${webapp_array[@]}"; do
+            local item_bindings=$(find_app_bindings "$item")
+            if [[ -n "$item_bindings" ]]; then
+                while IFS= read -r binding; do
+                    if [[ -n "$binding" ]]; then
+                        all_bindings_to_remove+=("$binding")
+                    fi
+                done <<< "$item_bindings"
             fi
-        fi
-        
-        # Track package removal results
-        total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]}))
+        done
 
-        # Remove packages and capture failure count
-        local pkg_failures=0
-        if [[ ${#pkg_array[@]} -gt 0 ]]; then
-            remove_packages "${pkg_array[@]}"
-            pkg_failures=$?
-        fi
-
-        # Remove webapps and capture failure count
-        local webapp_failures=0
-        if [[ ${#webapp_array[@]} -gt 0 ]]; then
-            remove_webapps "${webapp_array[@]}"
-            webapp_failures=$?
-        fi
-
-        total_failed=$((pkg_failures + webapp_failures))
-    else
-        # All are packages
-        # Collect bindings to remove if enabled
-        if [[ "$REMOVE_BINDINGS" == true ]]; then
+        if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
             echo ""
-            gum style --foreground 51 "Checking for keyboard shortcuts..."
-            
-            for pkg in "${packages[@]}"; do
-                local pkg_bindings=$(find_app_bindings "$pkg")
-                if [[ -n "$pkg_bindings" ]]; then
-                    while IFS= read -r binding; do
-                        if [[ -n "$binding" ]]; then
-                            all_bindings_to_remove+=("$binding")
-                        fi
-                    done <<< "$pkg_bindings"
-                fi
-            done
-            
-            # Remove bindings first
-            if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
-                echo ""
-                gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
-                remove_bindings_from_file "${all_bindings_to_remove[@]}"
-            else
-                echo ""
-                gum log --level info "No keyboard shortcuts found"
-            fi
+            gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
+            remove_bindings_from_file "${all_bindings_to_remove[@]}"
+        else
+            echo ""
+            gum log --level info "No keyboard shortcuts found"
         fi
-
-        # Track package removal results
-        total_attempted=${#packages[@]}
-        remove_packages "${packages[@]}"
-        total_failed=$?
     fi
-    
+
+    total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]} + ${#npmcli_array[@]}))
+
+    # Remove packages and capture failure count
+    local pkg_failures=0
+    if [[ ${#pkg_array[@]} -gt 0 ]]; then
+        remove_packages "${pkg_array[@]}"
+        pkg_failures=$?
+    fi
+
+    # Remove webapps and capture failure count
+    local webapp_failures=0
+    if [[ ${#webapp_array[@]} -gt 0 ]]; then
+        remove_webapps "${webapp_array[@]}"
+        webapp_failures=$?
+    fi
+
+    # Remove npm CLIs and capture failure count
+    local npmcli_failures=0
+    if [[ ${#npmcli_array[@]} -gt 0 ]]; then
+        remove_npm_clis "${npmcli_array[@]}"
+        npmcli_failures=$?
+    fi
+
+    total_failed=$((pkg_failures + webapp_failures + npmcli_failures))
+
     # Hero-style completion summary
     echo ""
     local successful_count=$((total_attempted - total_failed))
@@ -910,17 +964,20 @@ main() {
     echo ""
     
     # Show scanning message
-    gum style --foreground 51 "🔍 Scanning for installed packages and webapps..."
+    gum style --foreground 51 "🔍 Scanning for installed packages, webapps, and CLI tools..."
     echo ""
-    
+
     # Show spinners while scanning (the actual functions are fast, so we add a small delay for visual feedback)
     gum spin --spinner globe --title "Checking packages..." -- sleep 0.8
     readarray -t installed_packages < <(get_installed_packages)
-    
+
     gum spin --spinner globe --title "Checking webapps..." -- sleep 0.8
     readarray -t installed_webapps < <(get_installed_webapps)
-    
-    if [[ ${#installed_packages[@]} -eq 0 ]] && [[ ${#installed_webapps[@]} -eq 0 ]]; then
+
+    gum spin --spinner globe --title "Checking npm CLI tools..." -- sleep 0.8
+    readarray -t installed_npmclis < <(get_installed_npm_clis)
+
+    if [[ ${#installed_packages[@]} -eq 0 ]] && [[ ${#installed_webapps[@]} -eq 0 ]] && [[ ${#installed_npmclis[@]} -eq 0 ]]; then
         echo ""
         gum style \
             --foreground 82 \
@@ -930,19 +987,23 @@ main() {
             --margin "1" \
             "✓ System is clean!" \
             "" \
-            "No removable packages or webapps found."
+            "No removable packages, webapps, or CLI tools found."
         echo ""
         exit 0
     fi
-    
+
     # Go directly to selection
-    
-    # Combine packages and webapps with separator
+
+    # Combine packages, webapps, and npm CLIs with section separators
     local all_items=()
     all_items+=("${installed_packages[@]}")
     if [[ ${#installed_webapps[@]} -gt 0 ]]; then
         all_items+=("--webapps--")
         all_items+=("${installed_webapps[@]}")
+    fi
+    if [[ ${#installed_npmclis[@]} -gt 0 ]]; then
+        all_items+=("--npmclis--")
+        all_items+=("${installed_npmclis[@]}")
     fi
     
     # Use enhanced selection menu
@@ -959,18 +1020,24 @@ main() {
     # The function will set global variables with selected items
     local selected_packages="$SELECTED_PACKAGES"
     local selected_webapps="$SELECTED_WEBAPPS"
-    
-    # Convert to arrays properly - these are space-separated strings from the selection function
+    local selected_npmclis="$SELECTED_NPMCLIS"
+
+    # Convert to arrays properly - these are newline-delimited strings from the
+    # selection function (newline-delimited to preserve names with spaces)
     local packages_array=()
     local webapps_array=()
-    
-    # Parse newline-delimited strings into arrays
+    local npmclis_array=()
+
     if [[ -n "$selected_packages" ]]; then
         readarray -t packages_array <<< "$selected_packages"
     fi
-    
+
     if [[ -n "$selected_webapps" ]]; then
         readarray -t webapps_array <<< "$selected_webapps"
+    fi
+
+    if [[ -n "$selected_npmclis" ]]; then
+        readarray -t npmclis_array <<< "$selected_npmclis"
     fi
     
     # Check if any selected items have keyboard shortcuts
@@ -1041,7 +1108,7 @@ main() {
         gum style \
             --foreground 51 \
             --italic \
-            "Do you want to remove their keyboard shortcuts from ~/.config/hypr/bindings.conf?"
+            "Do you want to remove their keyboard shortcuts from ${BINDINGS_FILE/#$HOME/\~}?"
         
         gum style \
             --foreground 240 \
@@ -1077,12 +1144,16 @@ main() {
         items_to_remove+=("--webapps--")
         items_to_remove+=("${webapps_array[@]}")
     fi
-    
+    if [[ ${#npmclis_array[@]} -gt 0 ]]; then
+        items_to_remove+=("--npmclis--")
+        items_to_remove+=("${npmclis_array[@]}")
+    fi
+
     # Final confirmation
     clear
-    
+
     # Build confirmation content using separate lines
-    local total_count=$((${#packages_array[@]} + ${#webapps_array[@]}))
+    local total_count=$((${#packages_array[@]} + ${#webapps_array[@]} + ${#npmclis_array[@]}))
     
     # Show confirmation header
     gum style \
@@ -1126,7 +1197,7 @@ main() {
             --foreground 39 \
             --bold \
             "🌐 Webapps (${#webapps_array[@]}):"
-        
+
         for webapp in "${webapps_array[@]}"; do
             gum style \
                 --foreground 214 \
@@ -1134,7 +1205,22 @@ main() {
         done
         echo ""
     fi
-    
+
+    # Show npm CLI tools if any
+    if [[ ${#npmclis_array[@]} -gt 0 ]]; then
+        gum style \
+            --foreground 39 \
+            --bold \
+            "⬢ npm CLI tools (${#npmclis_array[@]}):"
+
+        for cli in "${npmclis_array[@]}"; do
+            gum style \
+                --foreground 214 \
+                "   • $cli"
+        done
+        echo ""
+    fi
+
     # Show keyboard shortcuts info if applicable
     if [[ "$REMOVE_BINDINGS" == true ]]; then
         local total_bindings=0

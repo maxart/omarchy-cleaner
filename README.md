@@ -14,11 +14,11 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 ## How It Works
 
-The script scans your system for Omarchy's default packages and webapps, presents them in an interactive selection interface, and safely removes your choices. It can also clean up associated keyboard shortcuts and provides visual feedback on completion status.
+The script scans your system for Omarchy's default **packages**, **webapps**, and **npm CLI tools**, presents them in an interactive fuzzy-select interface, and safely removes your choices. Unlike Omarchy's own all-or-nothing `omarchy-remove-preinstalls`, you pick exactly what to remove. It can also surgically clean up the associated Hyprland keyboard shortcuts — removing only the keybinds for the items you removed (with a backup), supporting both the current `bindings.lua` and the legacy `bindings.conf` formats — and provides visual feedback on completion status.
 
 ## Customization
 
-Edit the `DEFAULT_APPS` and `DEFAULT_WEBAPPS` arrays in the script to customize which items are offered for removal. The script includes comprehensive lists from Omarchy's default installation, with commonly unwanted applications enabled by default.
+Edit the `DEFAULT_APPS`, `DEFAULT_WEBAPPS`, and `DEFAULT_NPM_CLIS` arrays in the script to customize which items are offered for removal. The script includes comprehensive lists from Omarchy's default installation, with commonly unwanted applications enabled by default and the rest available as commented entries you can uncomment.
 
 
 

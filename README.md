@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 ## How It Works
 
-The script scans your system for Omarchy's default **packages**, **webapps**, and **npm CLI tools**, presents them in an interactive fuzzy-select interface, and safely removes your choices. Unlike Omarchy's own all-or-nothing `omarchy-remove-preinstalls`, you pick exactly what to remove. It can also surgically clean up the associated Hyprland keyboard shortcuts — removing only the keybinds for the items you removed (with a backup), supporting both the current `bindings.lua` and the legacy `bindings.conf` formats — and provides visual feedback on completion status.
+The script scans your system for Omarchy's default **packages**, **webapps**, and **CLI tools**, presents them in an interactive fuzzy-select interface, and safely removes your choices. Unlike Omarchy's own all-or-nothing `omarchy-remove-preinstalls`, you pick exactly what to remove. It can also surgically clean up the associated Hyprland keyboard shortcuts — stripping matching lines from your bindings file and, on Omarchy 4, appending `hl.unbind(...)` for packaged defaults (with a backup), supporting both the current `bindings.lua` and the legacy `bindings.conf` formats — and provides visual feedback on completion status.
 
 ## Customization
 
@@ -23,7 +23,7 @@ Edit the `DEFAULT_APPS`, `DEFAULT_WEBAPPS`, and `DEFAULT_NPM_CLIS` arrays in the
 
 
 ## Default Omarchy packages and webapps
-You can find the default Omarchy package list [here](https://github.com/basecamp/omarchy/blob/master/install/omarchy-base.packages) and the default webapps [here](https://github.com/basecamp/omarchy/blob/master/install/packaging/webapps.sh).
+You can find the default Omarchy package list [here](https://github.com/basecamp/omarchy/blob/master/install/omarchy-base.packages), the default webapps [here](https://github.com/basecamp/omarchy/tree/master/applications), and the default CLI stubs [here](https://github.com/basecamp/omarchy/blob/master/install/user/mise.sh).
 
 ## License
 

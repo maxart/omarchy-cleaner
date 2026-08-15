@@ -4,7 +4,7 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="2.1"
+VERSION="3.0"
 
 # Configuration
 # Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
@@ -22,29 +22,37 @@ REMOVE_BINDINGS=false
 # List from: https://github.com/basecamp/omarchy/blob/master/install/omarchy-base.packages
 # Apps Omarchy itself offers to drop live in: bin/omarchy-remove-preinstalls
 DEFAULT_APPS=(
-    # Packages offered for removal
-    "1password-beta"
-    "1password-cli"
+    # Packages offered for removal. Floor is Omarchy 4's omarchy-remove-preinstalls
+    # drop list; extra reach (docker, chromium, …) stays offered too.
+    "aether"
+    "cliamp"
     "kdenlive"
     "libreoffice-fresh"
-    "localsend"
-    "obs-studio"
-    "obsidian"
-    "chromium"
-    "signal-desktop"
-    "spotify"
     "xournalpp"
+    "pinta"
+    "obsidian"
+    "obs-studio"
+    "moonlight-qt"
+    "lazydocker"
+    "omacut"
+    "omacalc"
+    "omawrite"
+
+    "localsend"
+    "chromium"
     "docker"
     "docker-buildx"
     "docker-compose"
     "gpu-screen-recorder"
-    "claude-code"
-    "cliamp"
-    "typora"
-    "pinta"
-    "lazydocker"
 
-    "aether"
+    # No longer in Omarchy 4 base (moved to on-demand installs or replaced).
+    # Only offered if actually installed — 3.x upgrades and optional installs.
+    "1password-beta"
+    "1password-cli"
+    "signal-desktop"
+    "spotify"
+    "typora"
+    "claude-code"
 
     # Terminals from older Omarchy versions (current default is foot).
     # Only offered if actually installed; remove only if you use another terminal.
@@ -52,10 +60,13 @@ DEFAULT_APPS=(
     "alacritty"
 
     # Uncomment to include in removal list
+    # "asdcontrol"
     # "asdcontrol-git"
     # "avahi"
     # "bash-completion"
     # "bat"
+    # "bluez"
+    # "bluez-utils"
     # "bluetui"
     # "bolt"
     # "brightnessctl"
@@ -65,7 +76,10 @@ DEFAULT_APPS=(
     # "cups-browsed"
     # "cups-filters"
     # "cups-pdf"
+    # "ddcutil"
+    # "dotnet-runtime"
     # "dotnet-runtime-9.0"
+    # "dua-cli"
     # "dust"
     # "evince"
     # "exfatprogs"
@@ -78,6 +92,7 @@ DEFAULT_APPS=(
     # "fd"
     # "ffmpegthumbnailer"
     # "fontconfig"
+    # "foot"
     # "fzf"
     # "github-cli"
     # "gnome-calculator"
@@ -89,6 +104,7 @@ DEFAULT_APPS=(
     # "gvfs-mtp"
     # "gvfs-nfs"
     # "gvfs-smb"
+    # "herdr"
     # "hypridle"
     # "hyprland"
     # "hyprland-guiutils"
@@ -100,6 +116,7 @@ DEFAULT_APPS=(
     # "impala"
     # "imv"
     # "inetutils"
+    # "inotify-tools"
     # "inxi"
     # "iwd"
     # "jq"
@@ -108,15 +125,20 @@ DEFAULT_APPS=(
     # "less"
     # "libqalculate"
     # "libsecret"
+    # "libvips"
     # "libyaml"
     # "llvm"
+    # "lua51"
     # "luarocks"
     # "mako"
     # "man-db"
     # "mariadb-libs"
     # "mise"
     # "mpv"
+    # "mpv-mpris"
     # "nautilus"
+    # "nautilus-python"
+    # "networkmanager"
     # "noto-fonts"
     # "noto-fonts-cjk"
     # "noto-fonts-emoji"
@@ -125,6 +147,7 @@ DEFAULT_APPS=(
     # "nvim"
     # "omarchy-nvim"
     # "omarchy-walker"
+    # "pacman-contrib"
     # "pamixer"
     # "playerctl"
     # "plocate"
@@ -135,6 +158,8 @@ DEFAULT_APPS=(
     # "python-gobject"
     # "python-poetry-core"
     # "python-terminaltexteffects"
+    # "qrencode"
+    # "quickshell-git"
     # "qt5-wayland"
     # "ripgrep"
     # "ruby"
@@ -147,13 +172,20 @@ DEFAULT_APPS=(
     # "swaybg"
     # "swayosd"
     # "system-config-printer"
+    # "tensaku"
+    # "tesseract"
+    # "tesseract-data-eng"
     # "tldr"
+    # "tmux"
     # "tobi-try"
     # "tree-sitter-cli"
     # "ttf-cascadia-mono-nerd"
     # "ttf-ia-writer"
     # "ttf-jetbrains-mono-nerd"
+    # "ttf-jetbrains-mono-nerd-basic"
+    # "ttfx"
     # "tzupdate"
+    # "udiskie"
     # "ufw"
     # "ufw-docker"
     # "unzip"
@@ -167,17 +199,21 @@ DEFAULT_APPS=(
     # "wireplumber"
     # "wl-clipboard"
     # "woff2-font-awesome"
+    # "wtype"
     # "xdg-desktop-portal-gtk"
     # "xdg-desktop-portal-hyprland"
     # "xdg-terminal-exec"
     # "xmlstarlet"
     # "yaru-icon-theme"
     # "yay"
+    # "yt-dlp"
+    # "zbar"
     # "zoxide"
 )
 
 # Webapps
-# List from: https://github.com/basecamp/omarchy/blob/master/install/packaging/webapps.sh
+# List from: https://github.com/basecamp/omarchy/blob/master/applications
+# (packaged .desktop files copied to ~/.local/share/applications).
 DEFAULT_WEBAPPS=(
     "HEY"
     "Basecamp"
@@ -185,29 +221,36 @@ DEFAULT_WEBAPPS=(
     "Google Photos"
     "Google Contacts"
     "Google Messages"
-    "ChatGPT"
-    "YouTube"
-    "GitHub"
-    "X"
-    "Figma"
-    "Discord"
-    "Fizzy"
     "Google Maps"
+    "YouTube"
+    "X"
     "Zoom"
+    "Discord"
+    "Grok"
+    # Dropped from Omarchy 4 defaults; still offered if a leftover .desktop exists.
+    "ChatGPT"
+    "GitHub"
+    "Figma"
+    "Fizzy"
 )
 
-# NPM CLI tools
-# List from: https://github.com/basecamp/omarchy/blob/master/install/packaging/npm.sh
-# These are installed as `pnpm dlx` wrapper stubs in ~/.local/bin (not pacman),
-# so they are removed by deleting the stub. Omarchy's own remove-preinstalls
-# drops codex/gemini/copilot/opencode/playwright-cli/pi; we offer the full set.
+# CLI tools
+# List from: https://github.com/basecamp/omarchy/blob/master/install/user/mise.sh
+# These are installed as mise (Omarchy 4) or pnpm-dlx (Omarchy 3) wrapper stubs
+# in ~/.local/bin (not pacman), so they are removed by deleting the stub.
 DEFAULT_NPM_CLIS=(
     "codex"
+    "claude"
+    "crush"
     "gemini"
+    "gh"
     "copilot"
     "opencode"
+    "playwright"
     "playwright-cli"
     "pi"
+    "omp"
+    "grok"
     "ghui"
     "hunk"
 )
@@ -228,14 +271,15 @@ is_webapp_installed() {
     return $?
 }
 
-# Function to check if an npm CLI tool is installed
+# Function to check if a CLI tool stub is installed
 is_npm_cli_installed() {
     local cmd="$1"
     local stub="$HOME/.local/bin/$cmd"
     [[ -f "$stub" ]] || return 1
-    # Only treat Omarchy-generated pnpm dlx wrappers as removable, so we never
-    # delete an unrelated binary the user dropped in ~/.local/bin.
-    grep -q "pnpm dlx" "$stub" 2>/dev/null
+    # Only treat Omarchy-generated wrappers as removable, so we never delete
+    # an unrelated binary the user dropped in ~/.local/bin. Omarchy 4 uses
+    # mise stubs; Omarchy 3 used pnpm dlx.
+    grep -Eq "pnpm dlx|(^|[[:space:]])mise([[:space:]/\"']|$)" "$stub" 2>/dev/null
 }
 
 # Function to get list of installed packages from our removal list
@@ -252,11 +296,15 @@ get_installed_webapps() {
     for webapp in "${DEFAULT_WEBAPPS[@]}"; do
         if is_webapp_installed "$webapp"; then
             echo "$webapp"
+        elif [[ -n "$(find_packaged_unbind_keys "$webapp")" ]]; then
+            # Omarchy 4 dropped some launcher entries (ChatGPT, Grok) but kept
+            # packaged keybinds — still offer those for unbind-only cleanup.
+            echo "$webapp"
         fi
     done
 }
 
-# Function to get list of installed npm CLI tools from our removal list
+# Function to get list of installed CLI tools from our removal list
 get_installed_npm_clis() {
     for cli in "${DEFAULT_NPM_CLIS[@]}"; do
         if is_npm_cli_installed "$cli"; then
@@ -305,6 +353,7 @@ webapp_domains_for() {
         "fizzy")           echo "app.fizzy.do|fizzy.do" ;;
         "google maps")     echo "maps.google.com" ;;
         "zoom")            echo "zoom.us|zoom.com" ;;
+        "grok")            echo "grok.com" ;;
         *)                 echo "" ;;
     esac
 }
@@ -314,20 +363,24 @@ webapp_domains_for() {
 # docker tooling is bound via lazydocker.
 app_tokens_for() {
     case "$1" in
-        1password-beta|1password-cli)     echo "1password" ;;
+        1password-beta|1password-cli)        echo "1password" ;;
         docker|docker-buildx|docker-compose) echo "docker lazydocker" ;;
-        *)                                 echo "$1" ;;
+        moonlight-qt)                        echo "moonlight" ;;
+        signal-desktop)                      echo "signal" ;;
+        herdr)                               echo "herdr terminal-herdr" ;;
+        *)                                   echo "$1" ;;
     esac
 }
 
-# Function to find keyboard bindings for an app/webapp.
+# Function to find keyboard bindings for an app/webapp in a single file.
 # Handles both the current Lua format (o.bind("...", "...", { launch = "app" }))
 # and the legacy bindings.conf format (bindd = ..., exec, uwsm-app -- app).
-find_app_bindings() {
+find_bindings_in_file() {
     local app_name="$1"
+    local bindings_file="$2"
     local bindings=()
 
-    if [[ ! -f "$BINDINGS_FILE" ]]; then
+    if [[ ! -f "$bindings_file" ]]; then
         echo ""
         return
     fi
@@ -366,11 +419,11 @@ find_app_bindings() {
             fi
         else
             # Native app: match a launcher verb followed by one of the tokens,
-            # across both config formats.
+            # across both config formats (including Omarchy 4's `omarchy =`).
             local tok
             for tok in "${tokens[@]}"; do
                 local boundary="([\"[:space:]]|\$)"
-                if [[ "$line_lower" =~ (launch|tui)[[:space:]]*=[[:space:]]*\"$tok$boundary ]] \
+                if [[ "$line_lower" =~ (launch|tui|omarchy)[[:space:]]*=[[:space:]]*\"$tok$boundary ]] \
                    || [[ "$line_lower" =~ or-focus[[:space:]]+$tok$boundary ]] \
                    || [[ "$line_lower" =~ omarchy-launch-tui[[:space:]]+$tok$boundary ]] \
                    || [[ "$line_lower" =~ omarchy-launch-or-focus-tui[[:space:]]+$tok$boundary ]] \
@@ -381,10 +434,76 @@ find_app_bindings() {
                 fi
             done
         fi
-    done < "$BINDINGS_FILE"
+    done < "$bindings_file"
 
-    # Return unique bindings
-    printf '%s\n' "${bindings[@]}" | sort -u
+    if [[ ${#bindings[@]} -gt 0 ]]; then
+        printf '%s\n' "${bindings[@]}" | sort -u
+    fi
+}
+
+# User bindings file (overrides on Omarchy 4; full binds on 3.x).
+find_app_bindings() {
+    find_bindings_in_file "$1" "$BINDINGS_FILE"
+}
+
+# Packaged Omarchy 4 defaults live here, not in the user's bindings.lua.
+packaged_applications_bindings_file() {
+    local root="${OMARCHY_PATH:-/usr/share/omarchy}"
+    local candidate="$root/default/hypr/bindings/applications.lua"
+    if [[ -f "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+    return 1
+}
+
+extract_lua_bind_key() {
+    local line="$1"
+    if [[ "$line" =~ o\.bind\([[:space:]]*\"([^\"]+)\" ]]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
+}
+
+# Keys of packaged default binds for this app, to disable via hl.unbind.
+find_packaged_unbind_keys() {
+    local app_name="$1"
+    local file
+    file=$(packaged_applications_bindings_file) || return 0
+    [[ -n "$file" ]] || return 0
+
+    local keys=()
+    local line key
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        key=$(extract_lua_bind_key "$line")
+        [[ -n "$key" ]] && keys+=("$key")
+    done < <(find_bindings_in_file "$app_name" "$file")
+
+    if [[ ${#keys[@]} -gt 0 ]]; then
+        printf '%s\n' "${keys[@]}" | sort -u
+    fi
+}
+
+item_has_bindings() {
+    local item="$1"
+    [[ -n "$(find_app_bindings "$item")" ]] && return 0
+    [[ -n "$(find_packaged_unbind_keys "$item")" ]] && return 0
+    return 1
+}
+
+count_item_bindings() {
+    local item="$1"
+    local n=0
+    local bindings
+    bindings=$(find_app_bindings "$item")
+    if [[ -n "$bindings" ]]; then
+        n=$((n + $(printf '%s\n' "$bindings" | wc -l)))
+    fi
+    bindings=$(find_packaged_unbind_keys "$item")
+    if [[ -n "$bindings" ]]; then
+        n=$((n + $(printf '%s\n' "$bindings" | wc -l)))
+    fi
+    printf '%s\n' "$n"
 }
 
 # Function to remove bindings from the config file
@@ -435,6 +554,58 @@ remove_bindings_from_file() {
     return 0
 }
 
+# Append hl.unbind(...) to the user's Lua bindings file for packaged defaults.
+# Never edits the packaged applications.lua.
+append_lua_unbinds() {
+    local keys=("$@")
+    local key lua_file
+    local to_add=()
+
+    if [[ ${#keys[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    lua_file="$HOME/.config/hypr/bindings.lua"
+    if [[ "$BINDINGS_FILE" == *.lua && -n "$BINDINGS_FILE" ]]; then
+        lua_file="$BINDINGS_FILE"
+    fi
+
+    mkdir -p "$(dirname "$lua_file")"
+    if [[ ! -f "$lua_file" ]]; then
+        cat > "$lua_file" <<'EOF'
+-- Keep only your personal keybinding overrides here.
+EOF
+    fi
+
+    for key in "${keys[@]}"; do
+        [[ -n "$key" ]] || continue
+        if grep -Fq "hl.unbind(\"$key\")" "$lua_file" 2>/dev/null; then
+            continue
+        fi
+        to_add+=("$key")
+    done
+
+    if [[ ${#to_add[@]} -eq 0 ]]; then
+        gum log --level info "Packaged shortcuts already unbound"
+        return 0
+    fi
+
+    local backup_file="${lua_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$lua_file" "$backup_file"
+    gum log --level info "Created backup: $backup_file"
+
+    {
+        echo ""
+        echo "-- Omarchy Cleaner: unbind packaged defaults for removed apps ($(date +%Y-%m-%d))"
+        for key in "${to_add[@]}"; do
+            printf 'hl.unbind("%s")\n' "$key"
+        done
+    } >> "$lua_file"
+
+    gum log --level info "✓ Unbound ${#to_add[@]} packaged keyboard shortcut(s)"
+    return 0
+}
+
 
 # Enhanced selection menu using gum with integrated keyboard toggle
 enhanced_select_packages() {
@@ -469,10 +640,12 @@ enhanced_select_packages() {
             *)      prefix="📦 " ;;
         esac
 
-        # Check if this item has keyboard bindings (npm CLIs have none)
+        # Check if this item has keyboard bindings (CLI stubs have none)
         local item_bindings=""
         if [[ "${item_types[$i]}" != "npmcli" ]]; then
-            item_bindings=$(find_app_bindings "${all_items[$i]}")
+            if item_has_bindings "${all_items[$i]}"; then
+                item_bindings="yes"
+            fi
         fi
         if [[ -n "$item_bindings" ]]; then
             bindings_found[$i]=1
@@ -528,7 +701,7 @@ enhanced_select_packages() {
 
         local counts_msg="Found $pkg_count packages and $webapp_count webapps"
         if [[ $npm_count -gt 0 ]]; then
-            counts_msg="$counts_msg and $npm_count npm CLI tools"
+            counts_msg="$counts_msg and $npm_count CLI tools"
         fi
         gum style \
             --foreground 214 \
@@ -649,8 +822,19 @@ remove_webapps() {
         
         # Show current progress
         gum style --foreground 51 "[$current/$total] Processing: $webapp"
-        
-        if gum spin --spinner dot --title "Removing $webapp..." -- bash -c "omarchy-webapp-remove '$webapp' >/dev/null 2>&1"; then
+
+        local desktop_file="$HOME/.local/share/applications/$webapp.desktop"
+        local remove_ok=false
+        if [[ -f "$desktop_file" ]]; then
+            if gum spin --spinner dot --title "Removing $webapp..." -- bash -c "omarchy-webapp-remove '$webapp' >/dev/null 2>&1"; then
+                remove_ok=true
+            fi
+        else
+            # Packaged bind with no launcher entry (ChatGPT/Grok on Omarchy 4).
+            remove_ok=true
+        fi
+
+        if [[ "$remove_ok" == true ]]; then
             gum log --level info "✓ Removed: $webapp"
             removed_webapps+=("$webapp")
         else
@@ -683,7 +867,7 @@ remove_webapps() {
     return ${#failed_webapps[@]}
 }
 
-# Function to remove npm CLI tools (pnpm dlx wrapper stubs in ~/.local/bin)
+# Function to remove CLI tool stubs in ~/.local/bin
 remove_npm_clis() {
     local clis=("$@")
     local failed_clis=()
@@ -697,7 +881,7 @@ remove_npm_clis() {
     gum style \
         --foreground 39 \
         --bold \
-        "⬢ Removing ${#clis[@]} npm CLI tool(s)..."
+        "⬢ Removing ${#clis[@]} CLI tool(s)..."
     echo ""
 
     local current=0
@@ -730,7 +914,7 @@ remove_npm_clis() {
         echo ""
     done
 
-    # Summary for npm CLIs
+    # Summary for CLI tools
     echo ""
     if [[ ${#removed_clis[@]} -gt 0 ]]; then
         gum style --foreground 82 "Successfully removed: ${removed_clis[*]}"
@@ -826,13 +1010,15 @@ remove_items() {
     local webapp_array=("${PARSED_WEBAPPS[@]}")
     local npmcli_array=("${PARSED_NPMCLIS[@]}")
 
-    # Collect and remove keyboard shortcuts first (npm CLIs have none)
+    # Collect and remove keyboard shortcuts first (CLI stubs have none)
     if [[ "$REMOVE_BINDINGS" == true ]]; then
         echo ""
         gum style --foreground 51 "Checking for keyboard shortcuts..."
 
+        local unbind_keys=()
         for item in "${pkg_array[@]}" "${webapp_array[@]}"; do
-            local item_bindings=$(find_app_bindings "$item")
+            local item_bindings
+            item_bindings=$(find_app_bindings "$item")
             if [[ -n "$item_bindings" ]]; then
                 while IFS= read -r binding; do
                     if [[ -n "$binding" ]]; then
@@ -840,13 +1026,35 @@ remove_items() {
                     fi
                 done <<< "$item_bindings"
             fi
+            local packaged_keys
+            packaged_keys=$(find_packaged_unbind_keys "$item")
+            if [[ -n "$packaged_keys" ]]; then
+                while IFS= read -r key; do
+                    if [[ -n "$key" ]]; then
+                        unbind_keys+=("$key")
+                    fi
+                done <<< "$packaged_keys"
+            fi
         done
 
         if [[ ${#all_bindings_to_remove[@]} -gt 0 ]]; then
             echo ""
-            gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s)..."
+            gum style --foreground 51 "Removing ${#all_bindings_to_remove[@]} keyboard shortcut(s) from user config..."
             remove_bindings_from_file "${all_bindings_to_remove[@]}"
-        else
+        fi
+
+        if [[ ${#unbind_keys[@]} -gt 0 ]]; then
+            echo ""
+            gum style --foreground 51 "Unbinding ${#unbind_keys[@]} packaged keyboard shortcut(s)..."
+            # Unique keys
+            local unique_keys=()
+            while IFS= read -r key; do
+                [[ -n "$key" ]] && unique_keys+=("$key")
+            done < <(printf '%s\n' "${unbind_keys[@]}" | sort -u)
+            append_lua_unbinds "${unique_keys[@]}"
+        fi
+
+        if [[ ${#all_bindings_to_remove[@]} -eq 0 && ${#unbind_keys[@]} -eq 0 ]]; then
             echo ""
             gum log --level info "No keyboard shortcuts found"
         fi
@@ -974,7 +1182,7 @@ main() {
     gum spin --spinner globe --title "Checking webapps..." -- sleep 0.8
     readarray -t installed_webapps < <(get_installed_webapps)
 
-    gum spin --spinner globe --title "Checking npm CLI tools..." -- sleep 0.8
+    gum spin --spinner globe --title "Checking CLI tools..." -- sleep 0.8
     readarray -t installed_npmclis < <(get_installed_npm_clis)
 
     if [[ ${#installed_packages[@]} -eq 0 ]] && [[ ${#installed_webapps[@]} -eq 0 ]] && [[ ${#installed_npmclis[@]} -eq 0 ]]; then
@@ -1040,28 +1248,24 @@ main() {
         readarray -t npmclis_array <<< "$selected_npmclis"
     fi
     
-    # Check if any selected items have keyboard shortcuts
+    # Check if any selected items have keyboard shortcuts (user file and/or
+    # packaged Omarchy 4 defaults).
     local selected_items_have_bindings=false
     local total_bindings=0
-    
-    # Only check for bindings if the bindings file exists
-    if [[ -f "$BINDINGS_FILE" ]]; then
-        for pkg in "${packages_array[@]}"; do
-            local bindings=$(find_app_bindings "$pkg")
-            if [[ -n "$bindings" ]]; then
-                selected_items_have_bindings=true
-                total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
-            fi
-        done
-        
-        for webapp in "${webapps_array[@]}"; do
-            local bindings=$(find_app_bindings "$webapp")
-            if [[ -n "$bindings" ]]; then
-                selected_items_have_bindings=true
-                total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
-            fi
-        done
-    fi
+
+    for pkg in "${packages_array[@]}"; do
+        if item_has_bindings "$pkg"; then
+            selected_items_have_bindings=true
+            total_bindings=$((total_bindings + $(count_item_bindings "$pkg")))
+        fi
+    done
+
+    for webapp in "${webapps_array[@]}"; do
+        if item_has_bindings "$webapp"; then
+            selected_items_have_bindings=true
+            total_bindings=$((total_bindings + $(count_item_bindings "$webapp")))
+        fi
+    done
     
     # Ask about keyboard shortcut cleanup if selected items have bindings
     if [[ "$selected_items_have_bindings" == true ]]; then
@@ -1086,8 +1290,7 @@ main() {
         
         # Show items with bindings
         for pkg in "${packages_array[@]}"; do
-            local bindings=$(find_app_bindings "$pkg")
-            if [[ -n "$bindings" ]]; then
+            if item_has_bindings "$pkg"; then
                 gum style \
                     --foreground 214 \
                     "📦 $pkg"
@@ -1095,8 +1298,7 @@ main() {
         done
         
         for webapp in "${webapps_array[@]}"; do
-            local bindings=$(find_app_bindings "$webapp")
-            if [[ -n "$bindings" ]]; then
+            if item_has_bindings "$webapp"; then
                 gum style \
                     --foreground 214 \
                     "🌐 $webapp"
@@ -1105,10 +1307,15 @@ main() {
         
         echo ""
         
+        local bindings_target="${BINDINGS_FILE/#$HOME/\~}"
+        if [[ -z "$BINDINGS_FILE" ]]; then
+            bindings_target="~/.config/hypr/bindings.lua"
+        fi
+
         gum style \
             --foreground 51 \
             --italic \
-            "Do you want to remove their keyboard shortcuts from ${BINDINGS_FILE/#$HOME/\~}?"
+            "Do you want to remove their keyboard shortcuts from ${bindings_target}?"
         
         gum style \
             --foreground 240 \
@@ -1206,12 +1413,12 @@ main() {
         echo ""
     fi
 
-    # Show npm CLI tools if any
+    # Show CLI tools if any
     if [[ ${#npmclis_array[@]} -gt 0 ]]; then
         gum style \
             --foreground 39 \
             --bold \
-            "⬢ npm CLI tools (${#npmclis_array[@]}):"
+            "⬢ CLI tools (${#npmclis_array[@]}):"
 
         for cli in "${npmclis_array[@]}"; do
             gum style \
@@ -1225,12 +1432,10 @@ main() {
     if [[ "$REMOVE_BINDINGS" == true ]]; then
         local total_bindings=0
         for pkg in "${packages_array[@]}"; do
-            local bindings=$(find_app_bindings "$pkg")
-            [[ -n "$bindings" ]] && total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
+            total_bindings=$((total_bindings + $(count_item_bindings "$pkg")))
         done
         for webapp in "${webapps_array[@]}"; do
-            local bindings=$(find_app_bindings "$webapp")
-            [[ -n "$bindings" ]] && total_bindings=$((total_bindings + $(echo "$bindings" | wc -l)))
+            total_bindings=$((total_bindings + $(count_item_bindings "$webapp")))
         done
         
         if [[ $total_bindings -gt 0 ]]; then

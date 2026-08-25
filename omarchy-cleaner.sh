@@ -134,6 +134,7 @@ DEFAULT_APPS=(
     # "man-db"
     # "mariadb-libs"
     # "mise"
+    # "mise-bin"
     # "mpv"
     # "mpv-mpris"
     # "nautilus"
@@ -159,8 +160,10 @@ DEFAULT_APPS=(
     # "python-poetry-core"
     # "python-terminaltexteffects"
     # "qrencode"
-    # "quickshell-git"
     # "qt5-wayland"
+    # "qt6-imageformats"
+    # "quickshell"
+    # "quickshell-git"
     # "ripgrep"
     # "ruby"
     # "rust"
@@ -359,16 +362,17 @@ webapp_domains_for() {
 }
 
 # Map a package name to the token(s) its keybinding references. Packages and
-# their launch tokens don't always match (1password-beta -> 1password), and
-# docker tooling is bound via lazydocker.
+# their launch tokens don't always match (1password-beta -> 1password). Docker
+# was bound as lazydocker in Omarchy 4.0.0 and as omarchy-launch-docker-tui
+# from 4.0.1 (polkit wrapper after docker-group membership became opt-in).
 app_tokens_for() {
     case "$1" in
-        1password-beta|1password-cli)        echo "1password" ;;
-        docker|docker-buildx|docker-compose) echo "docker lazydocker" ;;
-        moonlight-qt)                        echo "moonlight" ;;
-        signal-desktop)                      echo "signal" ;;
-        herdr)                               echo "herdr terminal-herdr" ;;
-        *)                                   echo "$1" ;;
+        1password-beta|1password-cli)                         echo "1password" ;;
+        docker|docker-buildx|docker-compose|lazydocker)       echo "docker lazydocker omarchy-launch-docker-tui" ;;
+        moonlight-qt)                                         echo "moonlight" ;;
+        signal-desktop)                                       echo "signal" ;;
+        herdr)                                                echo "herdr terminal-herdr" ;;
+        *)                                                    echo "$1" ;;
     esac
 }
 

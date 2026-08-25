@@ -47,8 +47,9 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
 
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
 app_tokens_for          Maps a package -> the token(s) its keybind references
-                        (1password-beta -> 1password; docker* -> docker
-                        lazydocker; moonlight-qt -> moonlight).
+                        (1password-beta -> 1password; docker*/lazydocker ->
+                        docker, lazydocker, omarchy-launch-docker-tui;
+                        moonlight-qt -> moonlight).
 find_bindings_in_file   Shared matcher for one file: Lua o.bind (launch/tui/
                         omarchy/webapp) and legacy bindd = lines.
 find_app_bindings       User bindings.lua / bindings.conf.
@@ -171,8 +172,9 @@ user `bindings.lua`. Do **not** edit packaged files, and do **not** set
   `omarchy-launch-or-focus`, `omarchy-launch-tui`, `omarchy-launch-webapp`, etc.).
 
 Native apps are matched via `app_tokens_for` (handles `1password-*` → `1password`,
-`docker*` → `docker`/`lazydocker`, `moonlight-qt` → `moonlight`,
-`signal-desktop` → `signal`); webapps via `webapp_domains_for` (the binding must
+`docker*`/`lazydocker` → `docker`/`lazydocker`/`omarchy-launch-docker-tui`,
+`moonlight-qt` → `moonlight`, `signal-desktop` → `signal`); webapps via
+`webapp_domains_for` (the binding must
 invoke a webapp launcher *and* carry a URL on a matching domain). User-file
 removal is line-based. CLI stubs have no keybinds and are skipped.
 

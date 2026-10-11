@@ -76,7 +76,7 @@ and use disposable homes and stubbed system commands (see Build & Run).
 ### What "Omarchy default" means
 
 The catalogues are the heart of the tool and must track upstream Omarchy. The
-sources of truth, in the cloned Omarchy repo (`~/dev/omarchy`):
+sources of truth, in an available clone of the upstream Omarchy repo:
 
 - **`install/omarchy-base.packages`** — the canonical default package list.
 - **`applications/*.desktop`** — current webapp and TUI launchers.
@@ -196,6 +196,32 @@ python3 -m unittest discover -s tests -v  # isolated regression checks
 When testing logic that would actually uninstall things, test on a throwaway
 Omarchy VM/container or stub `pacman`/`omarchy-webapp-remove`, rather than on a
 working machine.
+
+### Required VM validation for runtime changes and PR reviews
+
+Use the [omarchy-vm-testing skill](skills/omarchy-vm-testing/SKILL.md) when
+changing or reviewing runtime behavior: catalogue/detection, selection,
+confirmation, removal, privileges, bindings, or TUI output. Run the isolated
+regression suite inside a configured disposable Omarchy VM and exercise the
+affected real workflow before reporting the change as validated. Host tests alone do not
+establish live Omarchy compatibility. Documentation-only changes do not require
+booting or resetting the VM.
+
+Read `.local/omarchy-vm.md` at the repository root for this machine's VM access
+and recovery instructions. This file and other `.local/` contents are Git-ignored.
+Keep machine-specific paths, host/container names, connection details, credential
+locations, and local recovery history there, never in committed files or public
+test reports. Never store credential values in documentation. If the local file
+is missing, report VM setup as unavailable rather than guessing access details.
+
+Run the cleaner inside the **VM guest**. A container hosting a hypervisor may
+still access host files; do not run real removals in that container or on the host.
+
+Test the exact PR revision or current working-tree files, including uncommitted
+changes. Follow the skill for safe snapshot use, credential handling, evidence,
+and recovery. Preserve unrelated guest work before resetting it. If the VM is
+unavailable, complete independent checks and explicitly report live validation
+as blocked; do not claim a VM pass from stubbed tests.
 
 ## Coding Style
 

@@ -1,2 +1,5 @@
 __pycache__/
 *.py[cod]
+
+# Private machine configuration, VM access details, and local test evidence.
+/.local/

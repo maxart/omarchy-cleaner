@@ -38,7 +38,7 @@ shellcheck omarchy-cleaner.sh
 python3 -m unittest discover -s tests -v
 ```
 
-Tests use temporary home directories and stubbed system commands, so they do not uninstall software. Their upstream fixtures cover Quattro 4.0.0/4.0.2, current Quattro catalogue additions, and the legacy 3.8.4 npx installer. See [fixture provenance](tests/fixtures/README.md) and the [Quattro review](docs/quattro-review.md). A live TUI/removal smoke test belongs on a disposable Omarchy VM.
+Tests use temporary home directories and stubbed system commands, so they do not uninstall software. Their upstream fixtures cover Quattro 4.0.0/4.0.2/4.0.4, current Quattro catalogue additions, and the legacy 3.8.4 npx installer. See [fixture provenance](tests/fixtures/README.md) and the [Quattro review](docs/quattro-review.md). A live TUI/removal smoke test belongs on a disposable Omarchy VM.
 
 ## License
 

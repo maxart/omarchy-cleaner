@@ -272,12 +272,15 @@ DEFAULT_NPM_CLIS=(
     "pi"
     "omp"
     "grok"
+    "cursor-agent"
     "ghui"
     "hunk"
+    "muse"
+    "hermes"
+    # Installed by Quattro development builds but not by 4.0.4.
     "agy"
     "hey"
     "ori"
-    "hermes"
 )
 
 # Function to check if package is installed
@@ -327,11 +330,13 @@ cli_packages_for() {
         pi)             printf '%s\n' pi @earendil-works/pi-coding-agent @mariozechner/pi-coding-agent ;;
         omp)            printf '%s\n' github:can1357/oh-my-pi ;;
         grok)           printf '%s\n' npm:@xai-official/grok ;;
+        cursor-agent)   printf '%s\n' cursor-agent ;;
         ghui)           printf '%s\n' npm:@kitlangton/ghui @kitlangton/ghui ;;
         hunk)           printf '%s\n' aqua:modem-dev/hunk ;;
         agy)            printf '%s\n' antigravity-cli ;;
         hey)            printf '%s\n' github:basecamp/hey-cli ;;
         ori)            printf '%s\n' github:OpenRouterLabs/ori-releases ;;
+        muse)           printf '%s\n' 'http:muse[url=https://api.meta.ai/muse-launcher.sh,bin=muse,version_list_url=https://api.meta.ai/muse-code/channels/muse-stable,version_json_path=.version]' ;;
     esac
 }
 

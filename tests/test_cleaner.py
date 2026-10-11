@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'omarchy-cleaner.sh'
 FIXTURES = Path(__file__).with_name('fixtures')
 CATALOGUES = json.loads((FIXTURES / 'catalogues.json').read_text())
+V404_CLI_PACKAGES = {cli['command']: cli['package'] for cli in CATALOGUES['v4.0.4']['clis']}
 
 STUB = r'''
 import json, os, pathlib, subprocess, sys
@@ -111,7 +112,100 @@ class CleanerTests(unittest.TestCase):
                 with self.subTest(cli=cli):
                     self.install_mise(cli['package'], cli['command'])
                     self.run_bash('is_npm_cli_installed ' + cli['command'])
+            offered = set(self.run_bash('get_installed_npm_clis').splitlines())
+            self.assertFalse({cli['command'] for cli in source['clis']} - offered)
         self.assertTrue({'ghostty', 'alacritty', 'opencode', '1password-beta'} <= active)
+
+    def test_v404_cli_selection_removes_only_selected_wrapper(self):
+        self.packaged.unlink()
+        bindings = 'o.bind("SUPER + M", "My Muse", { launch = "muse" })\n'
+        self.bindings.write_text(bindings)
+        sentinels = [self.home / path for path in
+                     ('.local/share/mise/installs/tool/data', '.cache/muse/data', '.config/Cursor/settings')]
+        for path in sentinels:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('keep')
+        for selected, kept in [('cursor-agent', 'muse'), ('muse', 'cursor-agent')]:
+            with self.subTest(selected=selected):
+                stubs = {cmd: self.install_mise(V404_CLI_PACKAGES[cmd], cmd)
+                         for cmd in (selected, kept)}
+                kept_bytes = stubs[kept].read_bytes()
+                self.assertEqual(set(self.run_bash('get_installed_npm_clis').splitlines()), set(stubs))
+                output = self.run_bash('main', FILTER_SELECTION='⬢ ' + selected, CONFIRM_RESULT='0')
+                self.assertIn('Completed all 1 selected removal(s).', output)
+                self.assertFalse(stubs[selected].exists())
+                self.assertEqual(stubs[kept].read_bytes(), kept_bytes)
+                self.assertEqual(self.bindings.read_text(), bindings)
+                self.assertFalse(list(self.bindings.parent.glob('*.backup.*')))
+                self.assertTrue(all(path.read_text() == 'keep' for path in sentinels))
+        self.assertFalse(self.calls('sudo'))
+        self.assertTrue(all(call[1] == '-Qi' for call in self.calls('pacman')))
+
+    def test_v404_cli_cancellation_keeps_wrappers(self):
+        self.packaged.unlink()
+        originals = {}
+        for cmd in ('cursor-agent', 'muse'):
+            stub = self.install_mise(V404_CLI_PACKAGES[cmd], cmd)
+            originals[stub] = stub.read_bytes()
+        self.run_bash('main', FILTER_SELECTION='⬢ cursor-agent\n⬢ muse', CONFIRM_RESULT='1')
+        for stub, content in originals.items():
+            self.assertEqual(stub.read_bytes(), content)
+        self.assertFalse(self.calls('sudo'))
+        self.assertTrue(all(call[1] == '-Qi' for call in self.calls('pacman')))
+
+    def test_v404_modified_wrappers_are_not_offered_or_removed(self):
+        for cmd in ('cursor-agent', 'muse'):
+            stub = self.install_mise(V404_CLI_PACKAGES[cmd], cmd)
+            original = stub.read_text()
+            self.assertIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+            variants = {
+                'custom command': original + '\necho customized\n',
+                'different package': original.replace(V404_CLI_PACKAGES[cmd], 'other-package'),
+                'different binary': original.replace('-- "' + cmd + '"', '-- "other-command"'),
+            }
+            if cmd == 'muse':
+                variants['different URL'] = original.replace('api.meta.ai', 'example.invalid')
+            for label, content in variants.items():
+                with self.subTest(command=cmd, variant=label):
+                    stub.write_text(content)
+                    self.assertNotIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+                    self.run_bash('remove_npm_clis ' + cmd, expected=1)
+                    self.assertEqual(stub.read_text(), content)
+            stub.unlink()
+            self.assertNotIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+            self.run_bash('remove_npm_clis ' + cmd, expected=1)
+
+    def test_v404_symlinks_are_not_offered_or_removed(self):
+        for cmd in ('cursor-agent', 'muse'):
+            with self.subTest(command=cmd):
+                stub = self.install_mise(V404_CLI_PACKAGES[cmd], cmd)
+                original = stub.read_bytes()
+                target = self.home / (cmd + '-user-managed')
+                stub.rename(target)
+                stub.symlink_to(target)
+                self.assertNotIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+                self.run_bash('remove_npm_clis ' + cmd, expected=1)
+                self.assertTrue(stub.is_symlink())
+                self.assertEqual(target.read_bytes(), original)
+                target.unlink()
+                self.assertNotIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+                self.run_bash('remove_npm_clis ' + cmd, expected=1)
+                self.assertTrue(stub.is_symlink())
+
+    def test_v404_cli_deletion_failure_is_reported(self):
+        stubs = {cmd: self.install_mise(V404_CLI_PACKAGES[cmd], cmd)
+                 for cmd in ('cursor-agent', 'muse')}
+        rm = self.bin / 'rm'
+        rm.write_text('#!/bin/bash\nexit 1\n')
+        rm.chmod(0o755)
+        for cmd, stub in stubs.items():
+            with self.subTest(command=cmd):
+                original = stub.read_bytes()
+                output = self.run_bash('remove_items --webapps-- --npmclis-- ' + cmd, expected=2)
+                self.assertIn('Could not complete any selected removals.', output)
+                self.assertEqual(stub.read_bytes(), original)
+        self.assertFalse(self.calls('sudo'))
+        self.assertFalse(self.calls('pacman'))
 
     def test_all_default_desktop_launchers_detected(self):
         for name in CATALOGUES['quattro']['desktops']:

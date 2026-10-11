@@ -29,12 +29,14 @@ DEFAULT_APPS=(
     # drop list; extra reach (docker, chromium, …) stays offered too.
     "aether"
     "cliamp"
+    "hype"
     "kdenlive"
     "libreoffice-fresh"
     "xournalpp"
     "pinta"
     "obsidian"
     "obs-studio"
+    "monologue"
     "moonlight-qt"
     "lazydocker"
     "omacut"
@@ -68,6 +70,7 @@ DEFAULT_APPS=(
     # "asdcontrol"
     # "asdcontrol-git"
     # "avahi"
+    # "base-devel"
     # "bash-completion"
     # "bat"
     # "bluez"
@@ -84,6 +87,7 @@ DEFAULT_APPS=(
     # "cups-pdf"
     # "cups-pk-helper"
     # "ddcutil"
+    # "disktree-bin"
     # "dosfstools"
     # "dotnet-runtime"
     # "dotnet-runtime-9.0"
@@ -96,15 +100,21 @@ DEFAULT_APPS=(
     # "fakeroot"
     # "fastfetch"
     # "fcitx5"
+    # "fcitx5-chewing"
+    # "fcitx5-chinese-addons"
     # "fcitx5-gtk"
+    # "fcitx5-hangul"
+    # "fcitx5-mozc"
     # "fcitx5-qt"
     # "fd"
+    # "ffmpeg"
     # "ffmpegthumbnailer"
     # "fontconfig"
     # "foot"
     # "fzf"
     # "git"
     # "github-cli"
+    # "gliff"
     # "gnome-calculator"
     # "gnome-disk-utility"
     # "gnome-keyring"
@@ -160,6 +170,9 @@ DEFAULT_APPS=(
     # "nvim"
     # "omarchy-nvim"
     # "omarchy-walker"
+    # "omasnap"
+    # "owe"
+    # "owe-lockfeed"
     # "pacman-contrib"
     # "pamixer"
     # "playerctl"
@@ -174,7 +187,12 @@ DEFAULT_APPS=(
     # "qemu-user-static-binfmt"
     # "qrencode"
     # "qt5-wayland"
+    # "qt6-base"
+    # "qt6-declarative"
     # "qt6-imageformats"
+    # "qt6-multimedia"
+    # "qt6-svg"
+    # "qt6-wayland"
     # "quickshell"
     # "quickshell-git"
     # "ripgrep"
@@ -185,6 +203,7 @@ DEFAULT_APPS=(
     # "slurp"
     # "socat"
     # "starship"
+    # "superwhisper-bin"
     # "sushi"
     # "swaybg"
     # "swayosd"
@@ -206,6 +225,7 @@ DEFAULT_APPS=(
     # "ufw"
     # "ufw-docker"
     # "unzip"
+    # "usbguard"
     # "usage"
     # "uwsm"
     # "vi"
@@ -276,10 +296,13 @@ DEFAULT_NPM_CLIS=(
     "ghui"
     "hunk"
     "muse"
+    # Legacy Hermes wrapper; requires the upstream read-only --owns contract.
     "hermes"
-    # Installed by Quattro development builds but not by 4.0.4.
+    # Additional Quattro defaults absent from 4.0.4.
     "agy"
     "hey"
+    "basecamp"
+    "cf"
     "ori"
 )
 
@@ -329,12 +352,14 @@ cli_packages_for() {
         playwright|playwright-cli) printf '%s\n' npm:playwright playwright ;;
         pi)             printf '%s\n' pi @earendil-works/pi-coding-agent @mariozechner/pi-coding-agent ;;
         omp)            printf '%s\n' github:can1357/oh-my-pi ;;
-        grok)           printf '%s\n' npm:@xai-official/grok ;;
+        grok)           printf '%s\n' grok npm:@xai-official/grok ;;
         cursor-agent)   printf '%s\n' cursor-agent ;;
         ghui)           printf '%s\n' npm:@kitlangton/ghui @kitlangton/ghui ;;
         hunk)           printf '%s\n' aqua:modem-dev/hunk ;;
         agy)            printf '%s\n' antigravity-cli ;;
         hey)            printf '%s\n' github:basecamp/hey-cli ;;
+        basecamp)       printf '%s\n' github:basecamp/basecamp-cli ;;
+        cf)             printf '%s\n' npm:cf ;;
         ori)            printf '%s\n' github:OpenRouterLabs/ori-releases ;;
         muse)           printf '%s\n' 'http:muse[url=https://api.meta.ai/muse-launcher.sh,bin=muse,version_list_url=https://api.meta.ai/muse-code/channels/muse-stable,version_json_path=.version]' ;;
     esac

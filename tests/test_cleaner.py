@@ -119,6 +119,88 @@ class CleanerTests(unittest.TestCase):
         output = self.run_bash('get_installed_webapps').splitlines()
         self.assertTrue(set(CATALOGUES['quattro']['desktops']) <= set(output))
 
+    def test_current_upstream_cli_discovery_and_preservation(self):
+        current = CATALOGUES['quattro-10f1cbf']
+        for cli in current['clis']:
+            self.install_mise(cli['package'], cli['command'])
+        missing = {cli['command'] for cli in current['clis']} - set(self.run_bash('get_installed_npm_clis').splitlines())
+        self.assertFalse(missing)
+        for cmd in ('basecamp', 'cf', 'grok'):
+            with self.subTest(command=cmd):
+                stub = self.home / '.local/bin' / cmd
+                original = stub.read_bytes()
+                stub.write_bytes(original + b'\necho custom\n')
+                self.run_bash('remove_npm_clis ' + cmd, expected=1)
+                self.assertNotIn(cmd, self.run_bash('get_installed_npm_clis').splitlines())
+                self.assertEqual(stub.read_bytes(), original + b'\necho custom\n')
+                stub.write_bytes(original)
+                self.run_bash('remove_npm_clis ' + cmd)
+                self.assertFalse(stub.exists())
+        self.assertFalse(self.calls('sudo'))
+
+    def test_basecamp_cli_and_webapp_are_independent(self):
+        cli = next(cli for cli in CATALOGUES['quattro-10f1cbf']['clis'] if cli['command'] == 'basecamp')
+        stub = self.install_mise(cli['package'], cli['command'])
+        desktop = self.desktop('Basecamp', CATALOGUES['quattro-10f1cbf']['desktops']['Basecamp'])
+        desktop_bytes = desktop.read_bytes()
+        output = self.run_bash('enhanced_select_packages --webapps-- Basecamp --npmclis-- basecamp; '
+                               'printf "RESULT<%s>|<%s>\\n" "$SELECTED_WEBAPPS" "$SELECTED_NPMCLIS"',
+                               FILTER_SELECTION='🌐 Basecamp\n⬢ basecamp')
+        self.assertIn('RESULT<Basecamp>|<basecamp>', output)
+        self.run_bash('remove_items --webapps-- --npmclis-- basecamp')
+        self.assertFalse(stub.exists())
+        self.assertEqual(desktop.read_bytes(), desktop_bytes)
+        self.install_mise(cli['package'], cli['command'])
+        stub_bytes = stub.read_bytes()
+        self.run_bash('remove_items --webapps-- Basecamp --npmclis--')
+        self.assertFalse(desktop.exists())
+        self.assertEqual(stub.read_bytes(), stub_bytes)
+        self.assertFalse(self.calls('sudo'))
+
+    def test_current_native_desktop_overrides_are_preserved(self):
+        current = CATALOGUES['quattro-10f1cbf']
+        for name, content in current['desktops'].items():
+            self.desktop(name, content)
+        native = {name: self.desktop(name, content) for name, content in current['native_desktops'].items()}
+        offered = set(self.run_bash('get_installed_webapps').splitlines())
+        self.assertTrue(set(current['desktops']) <= offered)
+        self.assertFalse(set(native) & offered)
+        for name, path in native.items():
+            with self.subTest(name=name):
+                self.run_bash('remove_webapps ' + name, expected=1)
+                self.assertEqual(path.read_text(), current['native_desktops'][name])
+        self.assertFalse(self.calls('omarchy-webapp-remove'))
+
+    def test_current_packaged_shortcuts_preserve_personal_overrides(self):
+        shutil.copyfile(FIXTURES / 'applications-10f1cbf.lua', self.packaged)
+        for item, key in [('omawrite', 'SUPER + SHIFT + W'), ('Google Messages', 'SUPER + SHIFT + CTRL + G')]:
+            with self.subTest(item=item):
+                self.assertIn(key, self.run_bash('find_packaged_unbind_keys "' + item + '"'))
+        for item in ('monologue', 'hype'):
+            self.assertEqual(self.run_bash('find_packaged_unbind_keys ' + item), '')
+        original = 'o.bind("SUPER + SHIFT + W", "My editor", { launch = "nvim" })\n'
+        self.bindings.write_text(original)
+        self.run_bash('cleanup_bindings omawrite')
+        updated = self.bindings.read_text()
+        self.assertIn(original, updated)
+        self.assertLess(updated.index('hl.unbind('), updated.index('o.bind('))
+        marker = self.home / '.local/state/omarchy/preinstalls-removed'
+        marker.parent.mkdir(parents=True)
+        marker.touch()
+        self.assertEqual(self.run_bash('find_packaged_unbind_keys "Google Messages"'), '')
+
+    def test_hermes_without_ownership_contract_is_kept(self):
+        stub = self.home / '.local/bin/hermes'
+        original = '#!/bin/bash\n# Written by omarchy-install-hermes-cli.\n'
+        stub.write_text(original)
+        helper = self.bin / 'omarchy-install-hermes-cli'
+        helper.write_text('#!/bin/bash\nprintf "%s\\n" "$*" > "$CALL_LOG.owns"\nexit 1\n')
+        self.assertNotIn('hermes', self.run_bash('get_installed_npm_clis').splitlines())
+        self.run_bash('remove_npm_clis hermes', expected=1)
+        self.assertEqual(Path(str(self.log) + '.owns').read_text(), '--owns\n')
+        self.assertEqual(stub.read_text(), original)
+        self.assertFalse(self.calls('sudo'))
+
     def test_quattro_400_wrappers_and_docker_binding(self):
         subprocess.run(['bash', str(FIXTURES / 'mise-install-4.0.0.sh'), 'codex'],
                        env=self.env, check=True)

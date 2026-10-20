@@ -62,10 +62,14 @@ enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
                         shortcut-only selections require cleanup consent.
 remove_npm_clis         Rechecks ownership and deletes selected stubs (no sudo).
+find_blocked_packages   Rootless `pacman -Rs --print` dry run; sets aside selected
+                        packages still required by installed ones outside the
+                        selection (ufw-docker -> docker), so the rest can go.
 remove_packages         Acquires sudo, removes selected packages in one transaction.
 remove_items            parse_sections, all three removers, then binding cleanup
                         only for successful removals, followed by the hero box.
-main                    Banner → scan → select → keybind prompt → confirm → remove.
+main                    Banner → scan → select → dry run → keybind prompt → confirm
+                        → remove.
 ```
 
 Runtime code is self-contained in this file. Regression tests live in `tests/`
@@ -132,6 +136,9 @@ keep the extra reach.
 The script runs unprivileged. Only `pacman -Rns` needs root, so `remove_packages`
 prompts for `sudo` once up front (`sudo -n true` check, then `sudo true`) and
 reuses the cached credential for one transaction containing all selected packages.
+Before that, `find_blocked_packages` runs a `pacman -Rs --print` dry run without
+sudo; packages it reports as still required are kept and explained, never
+removed by also removing their dependents.
 Webapp/TUI removal, CLI-wrapper deletion, and
 binding edits are all in the user's `$HOME` and never touch root. Keep this split
 — do not run the whole script under sudo.

@@ -252,17 +252,22 @@ class CleanerTests(unittest.TestCase):
         self.assertFalse(self.calls('sudo'))
 
     def test_current_native_desktop_overrides_are_preserved(self):
-        current = CATALOGUES['quattro-10f1cbf']
-        for name, content in current['desktops'].items():
-            self.desktop(name, content)
-        native = {name: self.desktop(name, content) for name, content in current['native_desktops'].items()}
-        offered = set(self.run_bash('get_installed_webapps').splitlines())
-        self.assertTrue(set(current['desktops']) <= offered)
-        self.assertFalse(set(native) & offered)
-        for name, path in native.items():
-            with self.subTest(name=name):
-                self.run_bash('remove_webapps ' + name, expected=1)
-                self.assertEqual(path.read_text(), current['native_desktops'][name])
+        # 4.0.6 adds omarchy-browser.desktop, a NoDisplay link handler copied
+        # into ~/.local/share/applications next to the webapps.
+        for snapshot, current in CATALOGUES.items():
+            if 'native_desktops' not in current:
+                continue
+            for name, content in current['desktops'].items():
+                self.desktop(name, content)
+            native = {name: self.desktop(name, content) for name, content in current['native_desktops'].items()}
+            offered = set(self.run_bash('get_installed_webapps').splitlines())
+            self.assertTrue(set(current['desktops']) <= offered)
+            self.assertFalse(set(native) & offered)
+            for name, path in native.items():
+                with self.subTest(snapshot=snapshot, name=name):
+                    self.run_bash('remove_webapps ' + name, expected=1)
+                    self.assertEqual(path.read_text(), current['native_desktops'][name])
+        self.assertIn('omarchy-browser', CATALOGUES['v4.0.6']['native_desktops'])
         self.assertFalse(self.calls('omarchy-webapp-remove'))
 
     def test_current_packaged_shortcuts_preserve_personal_overrides(self):

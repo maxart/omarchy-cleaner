@@ -22,7 +22,7 @@ def display_width(text):
     return sum(2 if unicodedata.east_asian_width(char) in 'WF' else 1 for char in text)
 
 STUB = r'''
-import json, os, pathlib, subprocess, sys
+import json, os, pathlib, subprocess, sys, textwrap
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ['CALL_LOG'], 'a') as log:
@@ -52,12 +52,19 @@ elif name == 'pacman':
         installed = os.environ.get('INSTALLED_PACKAGES', '').split()
         descriptions = json.loads(os.environ.get('STUB_PACKAGE_DESCRIPTIONS', '{}'))
         if '--' in args:
-            with open(os.environ['CALL_LOG'] + '.pacman-locale', 'a') as locale_log:
-                locale_log.write(os.environ.get('LC_ALL', '') + '\n')
+            with open(os.environ['CALL_LOG'] + '.pacman-env', 'a') as env_log:
+                env_log.write('LC_ALL=' + os.environ.get('LC_ALL', '') + ' COLUMNS=' + os.environ.get('COLUMNS', '') + '\n')
+        # Like pacman, wrap values to a positive COLUMNS, even into a pipe, with
+        # continuation lines indented to the 18-column value position.
+        columns = os.environ.get('STUB_PACMAN_WRAP') or os.environ.get('COLUMNS', '')
+        width = int(columns) - 18 if columns.isdigit() and int(columns) > 18 else 0
         for package in names:
             if package in installed:
+                description = descriptions.get(package, 'Test package ' + package)
+                if width:
+                    description = ('\n' + ' ' * 18).join(textwrap.wrap(description, width))
                 print('Name            : ' + package + '\nVersion         : 1.0-1\nDescription     : '
-                      + descriptions.get(package, 'Test package ' + package) + '\nArchitecture    : x86_64\n')
+                      + description + '\nArchitecture    : x86_64\n')
             else:
                 print("error: package '" + package + "' was not found", file=sys.stderr)
         sys.exit(0 if names and set(names) <= set(installed) else 1)
@@ -847,10 +854,29 @@ class CleanerTests(unittest.TestCase):
         self.assertTrue(all(call[1] == '-Qi' or call[1:3] == ['-Rs', '--print'] for call in self.calls('pacman')))
         self.assertTrue(self.home.joinpath('.local/bin/codex').exists())
 
-    def test_package_descriptions_are_read_in_the_c_locale(self):
+    def test_package_descriptions_are_read_unwrapped_in_the_c_locale(self):
         self.filter_rows('enhanced_select_packages obsidian')
-        self.assertEqual(Path(str(self.log) + '.pacman-locale').read_text(), 'C\n')
+        self.assertEqual(Path(str(self.log) + '.pacman-env').read_text(), 'LC_ALL=C COLUMNS=0\n')
         self.assertIn(['pacman', '-Qi', '--', 'obsidian'], self.calls('pacman'))
+
+    def test_wrapped_package_descriptions_are_kept_whole(self):
+        long = 'A powerful knowledge base that works on top of a local folder of plain text Markdown files'
+        environment = {**self.env, 'COLUMNS': '80', 'INSTALLED_PACKAGES': 'obsidian',
+                       'STUB_PACKAGE_DESCRIPTIONS': json.dumps({'obsidian': long})}
+        stub = subprocess.run([str(self.bin / 'pacman'), '-Qi', '--', 'obsidian'], env=environment,
+                              capture_output=True, text=True).stdout
+        self.assertIn('\n' + ' ' * 18 + 'of plain text', stub, 'the fixture wraps like pacman')
+        # COLUMNS=0 alone, then continuation joining alone with forced wrapping.
+        for forced_wrap in ('', '40'):
+            with self.subTest(forced_wrap=forced_wrap):
+                output = self.run_bash('load_package_descriptions obsidian; '
+                                       'printf "<%s>" "${PACKAGE_DESCRIPTIONS[obsidian]}"',
+                                       **{**environment, 'STUB_PACMAN_WRAP': forced_wrap})
+                self.assertEqual(output, '<' + long + '>')
+        output = self.run_bash('load_package_descriptions obsidian; print_confirmation_items package obsidian',
+                               **{**environment, 'COLUMNS': '100'})
+        blurb = re.search(r'   • obsidian {2,}(.*)$', output, re.M).group(1)
+        self.assertTrue(blurb.endswith('…') and long.startswith(blurb[:-1]), blurb)
 
     def test_parse_sections_handles_empty_and_space_names(self):
         output = self.run_bash('parse_sections --webapps-- "Google Photos" --npmclis-- codex; '

@@ -610,19 +610,26 @@ curated_description_for() {
 }
 
 # Read every offered package's description in one query. LC_ALL=C keeps the
-# field labels English whatever language Omarchy is set to.
+# field labels English whatever language Omarchy is set to. pacman wraps values
+# to an exported COLUMNS even into a pipe; COLUMNS=0 turns that off, and any
+# indented continuation lines are still joined back on.
 load_package_descriptions() {
     PACKAGE_DESCRIPTIONS=()
     [[ $# -gt 0 ]] || return 0
-    local line name=""
+    local line name="" in_description=false
     while IFS= read -r line; do
         if [[ "$line" =~ ^Name[[:space:]]*:[[:space:]](.*)$ ]]; then
             name="${BASH_REMATCH[1]}"
+            in_description=false
         elif [[ -n "$name" && "$line" =~ ^Description[[:space:]]*:[[:space:]](.*)$ ]]; then
             PACKAGE_DESCRIPTIONS["$name"]="${BASH_REMATCH[1]}"
-            name=""
+            in_description=true
+        elif [[ "$in_description" == true && "$line" =~ ^[[:space:]]+([^[:space:]].*)$ ]]; then
+            PACKAGE_DESCRIPTIONS["$name"]+=" ${BASH_REMATCH[1]}"
+        else
+            in_description=false
         fi
-    done < <(LC_ALL=C pacman -Qi -- "$@" 2>/dev/null)
+    done < <(COLUMNS=0 LC_ALL=C pacman -Qi -- "$@" 2>/dev/null)
 }
 
 # Package metadata is shown verbatim: drop control characters (and with them

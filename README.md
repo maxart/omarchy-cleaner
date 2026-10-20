@@ -16,6 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/maxart/omarchy-cleaner/main/omarchy
 
 The script scans for Omarchy's default **packages**, **desktop launchers (webapps and TUIs)**, and **CLI wrappers**, then lets you choose what to remove. Nothing is preselected, and an itemized confirmation comes before removal.
 
+Each item shows a one-line description, so unfamiliar names are easier to judge. Packages use their official pacman description; webapps, TUIs, and CLI tools use their project's own one-liner ([sources](docs/item-descriptions.md)). Descriptions are trimmed to fit your terminal and can be searched in the filter.
+
 Omarchy 4 (Quattro) is supported alongside older installations. Shortcut cleanup removes matching single-line bindings from your personal config and disables packaged defaults in your `bindings.lua`, before your personal overrides. Packaged Omarchy files stay intact. Existing configs receive a unique timestamped backup before edits, and shortcuts are cleaned only after the associated removal succeeds. Multiline/computed Lua bindings and ambiguous long-string layouts are left for manual editing.
 
 Items marked **shortcut only** have a packaged shortcut but no desktop launcher. They are skipped if you decline shortcut cleanup. CLI removal deletes only recognized Omarchy wrappers in `~/.local/bin`; installed mise/npm runtimes, caches, and application data remain. Customized wrappers and symlinks are left alone.

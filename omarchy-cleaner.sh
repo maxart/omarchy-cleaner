@@ -4,7 +4,7 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="3.1"
+VERSION="3.2"
 
 # Configuration
 # Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
@@ -20,6 +20,8 @@ if [[ -f "$HOME/.config/hypr/hyprland.lua" ]]; then
     BINDINGS_FILE="$HOME/.config/hypr/bindings.lua"
 fi
 REMOVE_BINDINGS=false
+# Package name -> pacman description, filled by load_package_descriptions.
+declare -A PACKAGE_DESCRIPTIONS=()
 
 # App
 # List from: https://github.com/omacom/omarchy/blob/quattro/install/omarchy-base.packages
@@ -559,6 +561,132 @@ app_tokens_for() {
     esac
 }
 
+# Each project's own one-line description, for items with no local metadata.
+# Packages use their pacman description instead. Sources and trimming rules:
+# docs/item-descriptions.md. The category keeps Grok/grok and HEY/hey apart.
+curated_description_for() {
+    case "$1:$2" in
+        "webapp:HEY")             echo "A delightfully fresh take on email + calendar, from 37signals" ;;
+        "webapp:Basecamp")        echo "Basecamp puts everything you need to get work done in one place" ;;
+        "webapp:WhatsApp")        echo "Simple, reliable, private messaging and calling for free" ;;
+        "webapp:Google Photos")   echo "Edit, Organize, Search, and Backup Your Photos" ;;
+        "webapp:Google Contacts") echo "Save names, email addresses, phone numbers, and more" ;;
+        "webapp:Google Messages") echo "A simple, helpful text messaging app" ;;
+        "webapp:Google Maps")     echo "Google Maps is your ultimate guide to explore and navigate the world" ;;
+        "webapp:YouTube")         echo "Enjoy the videos and music you love, upload original content" ;;
+        "webapp:X")               echo "From breaking news and entertainment to sports and politics, get the full story" ;;
+        "webapp:Zoom")            echo "Zoom's trusted collaboration tools: including video meetings, Zoom Chat, VoIP phone, webinars" ;;
+        "webapp:Discord")         echo "Group Chat That’s All Fun & Games" ;;
+        "webapp:Grok")            echo "Grok is an AI assistant" ;;
+        "webapp:ChatGPT")         echo "ChatGPT helps you get answers, find inspiration, and be more productive" ;;
+        "webapp:GitHub")          echo "The world's most widely adopted, AI-powered developer platform" ;;
+        "webapp:Figma")           echo "Figma is the canvas where design, code, and AI come together" ;;
+        "webapp:Fizzy")           echo "A refreshing take on cards, columns, and kanban" ;;
+        "webapp:Docker")          echo "A simple terminal UI for docker and docker-compose" ;;
+        "webapp:Disk Usage")      echo "View disk space usage and delete unwanted data, fast" ;;
+        "npmcli:codex")           echo "Codex CLI is a coding agent from OpenAI that runs locally on your computer" ;;
+        "npmcli:claude")          echo "Use Claude, Anthropic's AI assistant, right from your terminal" ;;
+        "npmcli:crush")           echo "The glamourous AI coding agent for your favourite terminal" ;;
+        "npmcli:gemini")          echo "An open-source AI agent that brings the power of Gemini directly into your terminal" ;;
+        "npmcli:gh")              echo "GitHub’s official command line tool" ;;
+        "npmcli:copilot")         echo "GitHub Copilot CLI brings the power of Copilot coding agent directly to your terminal" ;;
+        "npmcli:opencode")        echo "The open source coding agent" ;;
+        "npmcli:playwright"|"npmcli:playwright-cli")
+                                  echo "A high-level API to automate web browsers" ;;
+        "npmcli:pi")              echo "Coding agent CLI with read, bash, edit, write tools and session management" ;;
+        "npmcli:omp")             echo "Coding agent with the IDE wired in" ;;
+        "npmcli:grok")            echo "Bring Grok into your terminal" ;;
+        "npmcli:cursor-agent")    echo "Cursor CLI — Run Agents in Terminal" ;;
+        "npmcli:ghui")            echo "Terminal UI for GitHub pull requests" ;;
+        "npmcli:hunk")            echo "Review-first terminal diff viewer for agentic coders" ;;
+        "npmcli:muse")            echo "Muse Code is the coding agent built to run Muse Spark 1.2" ;;
+        "npmcli:hermes")          echo "Hermes Agent is the open-source, self-hosted AI agent by Nous Research" ;;
+        "npmcli:agy")             echo "Google Antigravity CLI companion" ;;
+        "npmcli:hey")             echo "HEY CLI and Agent Skills" ;;
+        "npmcli:basecamp")        echo "The official command-line interface for Basecamp" ;;
+        "npmcli:cf")              echo "The agentic CLI for the entire Cloudflare API" ;;
+        "npmcli:ori")             echo "OpenRouter's CLI for working with projects you already have" ;;
+    esac
+}
+
+# Read every offered package's description in one query. LC_ALL=C keeps the
+# field labels English whatever language Omarchy is set to.
+load_package_descriptions() {
+    PACKAGE_DESCRIPTIONS=()
+    [[ $# -gt 0 ]] || return 0
+    local line name=""
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^Name[[:space:]]*:[[:space:]](.*)$ ]]; then
+            name="${BASH_REMATCH[1]}"
+        elif [[ -n "$name" && "$line" =~ ^Description[[:space:]]*:[[:space:]](.*)$ ]]; then
+            PACKAGE_DESCRIPTIONS["$name"]="${BASH_REMATCH[1]}"
+            name=""
+        fi
+    done < <(LC_ALL=C pacman -Qi -- "$@" 2>/dev/null)
+}
+
+# Package metadata is shown verbatim: drop control characters (and with them
+# any escape sequences) and collapse whitespace. pacman prints None for empty.
+clean_description() {
+    local -a words
+    read -r -a words <<< "${1//[[:cntrl:]]/ }"
+    [[ "${words[*]}" == None ]] && return 0
+    printf '%s' "${words[*]}"
+}
+
+item_description() {
+    case "$1" in
+        package) clean_description "${PACKAGE_DESCRIPTIONS[$2]:-}" ;;
+        *)       clean_description "$(curated_description_for "$1" "$2")" ;;
+    esac
+}
+
+# gum cuts rows at the terminal edge without an ellipsis, so trim to a word.
+fit_description() {
+    local text="$1" width="$2"
+    [[ -n "$text" && "$width" -ge 12 ]] || return 0
+    if [[ ${#text} -le $width ]]; then
+        printf '%s' "$text"
+        return 0
+    fi
+    text="${text:0:width-1}"
+    [[ "$text" == *" "* ]] && text="${text% *}"
+    while [[ "$text" == *[[:space:],\;:—-] ]]; do
+        text="${text%?}"
+    done
+    printf '%s…' "$text"
+}
+
+# An exported COLUMNS wins, so callers and tests can pin the layout width.
+terminal_columns() {
+    local size columns
+    if [[ "${COLUMNS:-}" =~ ^[1-9][0-9]*$ ]]; then
+        columns="$COLUMNS"
+    elif size=$(stty size < /dev/tty 2>/dev/null) && [[ "${size#* }" =~ ^[1-9][0-9]*$ ]]; then
+        columns="${size#* }"
+    elif ! columns=$(tput cols 2>/dev/null) || [[ ! "$columns" =~ ^[1-9][0-9]*$ ]]; then
+        columns=80
+    fi
+    printf '%s\n' "$columns"
+}
+
+# Pad a label so descriptions start at one display column, then fit the
+# description into what is left of the row. lead_columns is where the label
+# starts on screen. Without a description the row is just lead and label.
+described_row() {
+    local lead="$1" lead_columns="$2" label="$3" description="$4" target="$5" columns="$6"
+    local used=$((lead_columns + ${#label}))
+    local pad=$((target - used))
+    ((pad < 2)) && pad=2
+    local blurb
+    blurb=$(fit_description "$description" $((columns - used - pad - 1)))
+    if [[ -n "$blurb" ]]; then
+        printf '%s%s%*s%s\n' "$lead" "$label" "$pad" '' "$blurb"
+    else
+        printf '%s%s\n' "$lead" "$label"
+    fi
+}
+
 # A line-oriented matcher cannot safely interpret mixed Lua string expressions.
 # Decline user-line deletion for ambiguous long-string layouts anywhere in a file.
 # Default unbinds can still be prepended without changing that file's own lines.
@@ -858,13 +986,17 @@ enhanced_select_packages() {
         item_types+=("npmcli")
     done
 
-    # Build display items with type indicators and binding markers
+    # Build display items with type indicators, binding markers, and descriptions
+    load_package_descriptions "${PARSED_PACKAGES[@]}"
+    local prefixes=() lead_columns=() labels=() descriptions=()
+    local label_width=0
     for i in "${!all_items[@]}"; do
-        local prefix=""
+        # gum's indicator and selection prefix take five columns. 📦 and 🌐 are
+        # two columns wide and ⬢ is one, so labels start at column 8 or 7.
         case "${item_types[$i]}" in
-            webapp) prefix="🌐 " ;;
-            npmcli) prefix="⬢ " ;;
-            *)      prefix="📦 " ;;
+            webapp) prefixes[i]="🌐 "; lead_columns[i]=8 ;;
+            npmcli) prefixes[i]="⬢ "; lead_columns[i]=7 ;;
+            *)      prefixes[i]="📦 "; lead_columns[i]=8 ;;
         esac
 
         # Check if this item has keyboard bindings (CLI stubs have none)
@@ -878,13 +1010,26 @@ enhanced_select_packages() {
                 item_bindings="yes"
             fi
         fi
+        labels[i]="${all_items[$i]}${suffix}"
         if [[ -n "$item_bindings" ]]; then
             bindings_found[i]=1
-            display_items+=("${prefix}${all_items[$i]}${suffix} ⌨")
+            labels[i]+=" ⌨"
         else
             bindings_found[i]=0
-            display_items+=("${prefix}${all_items[$i]}${suffix}")
         fi
+        descriptions[i]=$(item_description "${item_types[$i]}" "${all_items[$i]}")
+        if [[ -n "${descriptions[i]}" && ${#labels[i]} -gt $label_width ]]; then
+            label_width=${#labels[i]}
+        fi
+    done
+
+    # One very long label should not push every description off screen.
+    ((label_width > 32)) && label_width=32
+    local columns
+    columns=$(terminal_columns)
+    for i in "${!all_items[@]}"; do
+        display_items+=("$(described_row "${prefixes[i]}" "${lead_columns[i]}" "${labels[i]}" \
+            "${descriptions[i]}" $((8 + label_width + 2)) "$columns")")
     done
     
     # Check if any items have bindings
@@ -1085,6 +1230,31 @@ print_kept_packages() {
     done
     gum style --foreground 240 --italic "To remove one, also select the packages that need it."
     echo ""
+}
+
+# Itemised confirmation rows, with descriptions aligned within each section.
+print_confirmation_items() {
+    local type="$1"
+    shift
+    local labels=() descriptions=()
+    local name label width=0 columns i
+    for name in "$@"; do
+        label="$name"
+        if [[ "$type" == webapp ]] && ! is_webapp_installed "$name"; then
+            label="$name (shortcut only)"
+        fi
+        labels+=("$label")
+        descriptions+=("$(item_description "$type" "$name")")
+        if [[ -n "${descriptions[-1]}" && ${#label} -gt $width ]]; then
+            width=${#label}
+        fi
+    done
+    ((width > 32)) && width=32
+    columns=$(terminal_columns)
+    for i in "${!labels[@]}"; do
+        gum style --foreground 214 \
+            "$(described_row "   • " 5 "${labels[i]}" "${descriptions[i]}" $((5 + width + 2)) "$columns")"
+    done
 }
 
 # Packages are removed together so selected dependencies (e.g. docker-buildx
@@ -1484,11 +1654,7 @@ main() {
             --bold \
             "📦 Packages (${#packages_array[@]}):"
         
-        for pkg in "${packages_array[@]}"; do
-            gum style \
-                --foreground 214 \
-                "   • $pkg"
-        done
+        print_confirmation_items package "${packages_array[@]}"
         echo ""
     fi
     print_kept_packages
@@ -1500,11 +1666,7 @@ main() {
             --bold \
             "🌐 Webapps / TUIs (${#webapps_array[@]}):"
 
-        for webapp in "${webapps_array[@]}"; do
-            local label="$webapp"
-            is_webapp_installed "$webapp" || label="$webapp (shortcut only)"
-            gum style --foreground 214 "   • $label"
-        done
+        print_confirmation_items webapp "${webapps_array[@]}"
         echo ""
     fi
 
@@ -1515,11 +1677,7 @@ main() {
             --bold \
             "⬢ CLI wrappers (${#npmclis_array[@]}):"
 
-        for cli in "${npmclis_array[@]}"; do
-            gum style \
-                --foreground 214 \
-                "   • $cli"
-        done
+        print_confirmation_items npmcli "${npmclis_array[@]}"
         echo ""
     fi
 

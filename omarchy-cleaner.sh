@@ -539,18 +539,23 @@ webapp_domains_for() {
     esac
 }
 
-# Map a package name to the token(s) its keybinding references. Packages and
-# their launch tokens don't always match (1password-beta -> 1password). Docker
+# Map a package name to newline-delimited commands its keybinding references.
+# Keep subcommands intact: removing a Docker plugin must not claim every Docker
+# shortcut. Package and command names can differ (1password-cli -> op). Docker
 # was bound as lazydocker in Omarchy 4.0.0 and as omarchy-launch-docker-tui
 # from 4.0.1 (polkit wrapper after docker-group membership became opt-in).
 app_tokens_for() {
     case "$1" in
-        1password-beta|1password-cli)                         echo "1password" ;;
-        docker|docker-buildx|docker-compose|lazydocker)       echo "docker lazydocker omarchy-launch-docker-tui" ;;
-        moonlight-qt)                                         echo "moonlight" ;;
-        signal-desktop)                                       echo "signal" ;;
-        herdr)                                                echo "herdr terminal-herdr" ;;
-        *)                                                    echo "$1" ;;
+        1password-beta) printf '%s\n' 1password ;;
+        1password-cli)  printf '%s\n' op ;;
+        docker)         printf '%s\n' docker lazydocker omarchy-launch-docker-tui ;;
+        docker-buildx)  printf '%s\n' docker-buildx 'docker buildx' ;;
+        docker-compose) printf '%s\n' docker-compose 'docker compose' ;;
+        Docker|lazydocker) printf '%s\n' lazydocker omarchy-launch-docker-tui ;;
+        moonlight-qt)   printf '%s\n' moonlight ;;
+        signal-desktop) printf '%s\n' signal ;;
+        herdr)          printf '%s\n' herdr terminal-herdr ;;
+        *)              printf '%s\n' "$1" ;;
     esac
 }
 
@@ -584,7 +589,9 @@ find_bindings_in_file() {
     local domains
     domains=$(webapp_domains_for "$app_name")
     local -a tokens
-    read -r -a tokens <<< "$(app_tokens_for "$app_name")"
+    # Preserve the catalogue's case: Docker is a desktop launcher; docker is
+    # the engine package. Removing the launcher must not claim engine commands.
+    readarray -t tokens < <(app_tokens_for "$1")
     local quote="[\"']"
     local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${quote}[^\"']+${quote}[[:space:]]*,[[:space:]]*(${quote}[^\"']*${quote}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${quote}([^\"']+)${quote}[^{}]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
     local legacy='^[[:space:]]*bindd[[:space:]]*=.*,[[:space:]]*exec[[:space:]]*,[[:space:]]*(.*)$'
@@ -1054,6 +1061,10 @@ find_blocked_packages() {
                 remaining+=("$package")
             fi
         done
+        # An unexpected diagnostic may name a package outside our selection.
+        # Stop if no selected target was set aside; never repeat the same preview
+        # forever. The real transaction still enforces pacman's dependency checks.
+        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 0
         REMOVABLE_PACKAGES=("${remaining[@]}")
     done
 }

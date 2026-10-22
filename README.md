@@ -20,7 +20,9 @@ Omarchy 4 (Quattro) is supported alongside older installations. Shortcut cleanup
 
 Items marked **shortcut only** have a packaged shortcut but no desktop launcher. They are skipped if you decline shortcut cleanup. CLI removal deletes only recognized Omarchy wrappers in `~/.local/bin`; installed mise/npm runtimes, caches, and application data remain. Customized wrappers and symlinks are left alone.
 
-Packages are removed in one `pacman -Rns` transaction, including unused dependencies and package backup configs. Only this step uses sudo; the script runs as your normal user. A selected package that other installed packages still need (Docker is needed by `ufw-docker`) is kept and named in the confirmation, so it cannot stop the rest from being removed. Select the packages that need it to remove them together.
+Packages are removed in one `pacman -Rns` transaction, including unused dependencies and package backup configs. Only this step uses sudo; the script runs as your normal user. A read-only preview sets aside selected packages that other installed packages still need (Docker is needed by `ufw-docker`) and names them in the confirmation. Select the packages that need them to remove them together. Other preview errors are left for the real transaction to report; pacman still enforces dependencies.
+
+Shortcut cleanup follows the removed command: removing Docker Compose or Buildx keeps Docker's TUI shortcut, and removing `1password-cli` keeps the 1Password desktop shortcut.
 
 ## Customization
 

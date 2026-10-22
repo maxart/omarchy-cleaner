@@ -43,8 +43,8 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
                         by both the selector and the remover.
 
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
-app_tokens_for          Maps a package -> the token(s) its keybind references
-                        (1password-beta -> 1password; docker* -> docker lazydocker).
+app_tokens_for          Maps a package -> newline-delimited commands its keybind
+                        references, preserving subcommands (docker compose).
 find_bindings_in_file   Matches supported single-line Lua/conf bindings; can
                         return line numbers so identical comment text survives.
 find_app_bindings       Matches the user's bindings file.
@@ -176,8 +176,12 @@ shortcuts. Never edit packaged config or disable every preinstall binding.
 - **.conf**: `bindd = ..., exec, <launcher> ...` (`uwsm-app --`,
   `omarchy-launch-or-focus`, `omarchy-launch-tui`, `omarchy-launch-webapp`, etc.).
 
-Native apps are matched via `app_tokens_for` (handles `1password-*` → `1password`
-and `docker*` → `docker`/`lazydocker`); webapps via `webapp_domains_for` (the
+Native apps are matched via `app_tokens_for` (`1password-cli` → `op`, Docker
+plugins → their own commands/subcommands). Removing a plugin must preserve
+Docker/lazydocker shortcuts; removing the CLI must preserve 1Password GUI
+shortcuts. Keep the exact catalogue case when mapping commands: the `Docker`
+desktop launcher must not claim the `docker` engine's bindings. Webapps are
+matched via `webapp_domains_for` (the
 binding must invoke a webapp launcher *and* carry a URL on a matching domain).
 Removal uses matched line numbers and leaves multiline/computed Lua alone.
 Long comments and strings are skipped using their exact delimiters. Webapp URLs

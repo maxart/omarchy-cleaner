@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,9 +15,14 @@ SCRIPT = ROOT / 'omarchy-cleaner.sh'
 FIXTURES = Path(__file__).with_name('fixtures')
 CATALOGUES = json.loads((FIXTURES / 'catalogues.json').read_text())
 V404_CLI_PACKAGES = {cli['command']: cli['package'] for cli in CATALOGUES['v4.0.4']['clis']}
+GUM_FILTER_COLUMNS = 5  # " ▸" indicator plus the three-column selection prefix
+
+
+def display_width(text):
+    return sum(2 if unicodedata.east_asian_width(char) in 'WF' else 1 for char in text)
 
 STUB = r'''
-import json, os, pathlib, subprocess, sys
+import json, os, pathlib, subprocess, sys, textwrap
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ['CALL_LOG'], 'a') as log:
@@ -27,8 +33,13 @@ if name == 'gum':
         if command[0] == 'sleep': sys.exit(0)
         sys.exit(subprocess.run(command).returncode)
     if args[0] == 'filter':
-        sys.stdin.read()
-        print(os.environ.get('FILTER_SELECTION', ''))
+        rows = sys.stdin.read().splitlines()
+        pathlib.Path(os.environ['CALL_LOG'] + '.filter').write_text(''.join(row + '\n' for row in rows))
+        # Pick rows as a user would, by name; print them exactly, like gum.
+        picked = []
+        for wanted in filter(None, os.environ.get('FILTER_SELECTION', '').split('\n')):
+            picked += [row for row in rows if row == wanted or row.startswith(wanted + ' ')][:1]
+        print('\n'.join(picked))
         sys.exit(int(os.environ.get('FILTER_RESULT', '0')))
     if args[0] == 'confirm': sys.exit(int(os.environ.get('CONFIRM_RESULT', '1')))
     print(' '.join(args))
@@ -37,7 +48,26 @@ elif name == 'sudo':
     sys.exit(subprocess.run(args).returncode)
 elif name == 'pacman':
     if args[0] == '-Qi':
-        sys.exit(0 if args[1] in os.environ.get('INSTALLED_PACKAGES', '').split() else 1)
+        names = [arg for arg in args[1:] if arg != '--']
+        installed = os.environ.get('INSTALLED_PACKAGES', '').split()
+        descriptions = json.loads(os.environ.get('STUB_PACKAGE_DESCRIPTIONS', '{}'))
+        if '--' in args:
+            with open(os.environ['CALL_LOG'] + '.pacman-env', 'a') as env_log:
+                env_log.write('LC_ALL=' + os.environ.get('LC_ALL', '') + ' COLUMNS=' + os.environ.get('COLUMNS', '') + '\n')
+        # Like pacman, wrap values to a positive COLUMNS, even into a pipe, with
+        # continuation lines indented to the 18-column value position.
+        columns = os.environ.get('STUB_PACMAN_WRAP') or os.environ.get('COLUMNS', '')
+        width = int(columns) - 18 if columns.isdigit() and int(columns) > 18 else 0
+        for package in names:
+            if package in installed:
+                description = descriptions.get(package, 'Test package ' + package)
+                if width:
+                    description = ('\n' + ' ' * 18).join(textwrap.wrap(description, width))
+                print('Name            : ' + package + '\nVersion         : 1.0-1\nDescription     : '
+                      + description + '\nArchitecture    : x86_64\n')
+            else:
+                print("error: package '" + package + "' was not found", file=sys.stderr)
+        sys.exit(0 if names and set(names) <= set(installed) else 1)
     if args[:2] == ['-Rs', '--print']:
         # Dry run: report installed packages outside the targets that need one.
         with open(os.environ['CALL_LOG'] + '.dry-run-locale', 'a') as locale_log:
@@ -95,7 +125,7 @@ class CleanerTests(unittest.TestCase):
             path.chmod(0o755)
         self.env = {**os.environ, 'HOME': str(self.home), 'OMARCHY_PATH': str(self.upstream),
                     'PATH': str(self.bin) + ':/usr/bin:/bin', 'CALL_LOG': str(self.log),
-                    'LC_ALL': 'C.UTF-8'}
+                    'LC_ALL': 'C.UTF-8', 'COLUMNS': '100'}
 
     def run_bash(self, code, expected=0, timeout=30, **environment):
         result = subprocess.run(['bash', '-c', 'source "$1"\n' + code, 'test', str(SCRIPT)],
@@ -739,6 +769,142 @@ class CleanerTests(unittest.TestCase):
                                'printf "RESULT<%s>|<%s>|<%s>\\n" "$SELECTED_PACKAGES" "$SELECTED_WEBAPPS" "$SELECTED_NPMCLIS"',
                                FILTER_SELECTION='🌐 Google Photos ⌨\n⬢ opencode')
         self.assertIn('RESULT<>|<Google Photos>|<opencode>', output)
+
+    def filter_rows(self, code='enhanced_select_packages obsidian --webapps-- "Google Photos" --npmclis-- codex',
+                    **environment):
+        environment.setdefault('INSTALLED_PACKAGES', 'obsidian')
+        self.run_bash(code, expected=1, FILTER_RESULT='1', **environment)
+        return Path(str(self.log) + '.filter').read_text().splitlines()
+
+    def test_every_curated_item_has_a_description(self):
+        output = self.run_bash(
+            'for name in "${DEFAULT_WEBAPPS[@]}" "${DEFAULT_TUIS[@]}"; do '
+            'printf "webapp\\t%s\\t%s\\n" "$name" "$(curated_description_for webapp "$name")"; done; '
+            'for name in "${DEFAULT_NPM_CLIS[@]}"; do '
+            'printf "npmcli\\t%s\\t%s\\n" "$name" "$(curated_description_for npmcli "$name")"; done')
+        rows = [line.split('\t') for line in output.splitlines()]
+        self.assertGreaterEqual(len(rows), 40)
+        for category, name, description in rows:
+            with self.subTest(category=category, name=name):
+                self.assertTrue(description)
+                self.assertLessEqual(len(description), 100)
+                self.assertEqual(description, ' '.join(description.split()))
+                self.assertFalse(description.endswith('.'))
+        self.assertNotEqual(self.run_bash('curated_description_for webapp Grok'),
+                            self.run_bash('curated_description_for npmcli grok'))
+
+    def test_selector_descriptions_align_and_fit_the_terminal(self):
+        self.desktop('Google Photos')
+        self.install_mise()
+        long = ('A powerful knowledge base that works on top of a local folder of plain text '
+                'Markdown files and keeps going')
+        for columns in ('80', '120'):
+            with self.subTest(columns=columns):
+                rows = self.filter_rows(COLUMNS=columns, STUB_PACKAGE_DESCRIPTIONS=json.dumps({'obsidian': long}))
+                self.assertEqual([row.split()[1] for row in rows], ['obsidian', 'Google', 'codex'])
+                starts = set()
+                for row, description in zip(rows, (long, 'Edit, Organize, Search', 'Codex CLI is')):
+                    label, blurb = re.split(r'\s{2,}', row, maxsplit=1)
+                    self.assertTrue(description.startswith(blurb.rstrip('…')) or blurb.startswith(description))
+                    starts.add(GUM_FILTER_COLUMNS + display_width(row[:len(row) - len(blurb)]))
+                    self.assertLessEqual(GUM_FILTER_COLUMNS + display_width(row), int(columns))
+                self.assertEqual(len(starts), 1, rows)
+                obsidian = re.split(r'\s{2,}', rows[0], maxsplit=1)[1]
+                self.assertTrue(obsidian.endswith('…'))
+                kept = obsidian[:-1]
+                self.assertEqual(long[len(kept)], ' ', 'trimmed at a word boundary')
+                self.assertIn('Google Photos ⌨', rows[1])
+
+    def test_every_catalogue_label_shares_the_description_column(self):
+        rows = self.filter_rows(
+            'enhanced_select_packages obsidian --webapps-- "${DEFAULT_WEBAPPS[@]}" "${DEFAULT_TUIS[@]}" '
+            '--npmclis-- "${DEFAULT_NPM_CLIS[@]}"', COLUMNS='200')
+        self.assertTrue(any(row.startswith('🌐 Google Messages (shortcut only) ⌨ ') for row in rows), rows)
+        blurbs = [re.split(r'\s{2,}', row, maxsplit=1)[1] for row in rows]
+        starts = {GUM_FILTER_COLUMNS + display_width(row[:len(row) - len(blurb)])
+                  for row, blurb in zip(rows, blurbs)}
+        self.assertEqual(len(starts), 1, 'raise the label cap for a longer catalogue label:\n' + '\n'.join(rows))
+
+    def test_wide_descriptions_are_trimmed_to_terminal_cells(self):
+        # CJK characters take two cells each, and break without spaces.
+        cjk = '基于本地纯文本文件夹的强大知识库，支持双向链接、图谱视图和丰富的社区插件生态系统'
+        for wide, columns in ((text, columns) for text in (cjk, 'Obsidian ' + cjk) for columns in (40, 80)):
+            environment = {'INSTALLED_PACKAGES': 'obsidian',
+                           'STUB_PACKAGE_DESCRIPTIONS': json.dumps({'obsidian': wide})}
+            with self.subTest(description=wide[:9], columns=columns):
+                row, = self.filter_rows('enhanced_select_packages obsidian', COLUMNS=str(columns), **environment)
+                output = self.run_bash('load_package_descriptions obsidian; print_confirmation_items package obsidian',
+                                       COLUMNS=str(columns), **environment)
+                confirmation = output.split('style --foreground 214 ', 1)[1].rstrip('\n')
+                for line, used in ((row, GUM_FILTER_COLUMNS + display_width(row)),
+                                   (confirmation, display_width(confirmation))):
+                    blurb = re.split(r'\s{2,}', line.lstrip(), maxsplit=1)[1]
+                    self.assertTrue(blurb.endswith('…') and wide.startswith(blurb[:-1]), line)
+                    self.assertLessEqual(used, columns, line)
+                    self.assertGreaterEqual(used, columns - 4, 'trimmed back to the space: ' + line)
+
+    def test_narrow_terminal_or_missing_description_keeps_plain_rows(self):
+        self.desktop('Google Photos')
+        self.install_mise()
+        self.assertEqual(self.filter_rows(COLUMNS='30'), ['📦 obsidian ⌨', '🌐 Google Photos ⌨', '⬢ codex'])
+        rows = self.filter_rows('enhanced_select_packages obsidian --webapps-- --npmclis-- not-a-catalogue-cli',
+                                STUB_PACKAGE_DESCRIPTIONS=json.dumps({'obsidian': 'None'}))
+        self.assertEqual(rows, ['📦 obsidian ⌨', '⬢ not-a-catalogue-cli'])
+
+    def test_package_description_control_characters_are_removed(self):
+        hostile = 'Notes\x1b]0;owned\x07 app\x1b[31m in\tred\r'
+        rows = self.filter_rows('enhanced_select_packages obsidian',
+                                STUB_PACKAGE_DESCRIPTIONS=json.dumps({'obsidian': hostile}))
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(any(unicodedata.category(char) == 'Cc' for char in rows[0]), repr(rows[0]))
+        self.assertIn('Notes ]0;owned app [31m in red', rows[0])
+
+    def test_described_rows_still_select_the_right_items(self):
+        self.desktop('Google Photos')
+        output = self.run_bash(
+            'enhanced_select_packages opencode --webapps-- "Google Photos" Grok --npmclis-- opencode grok; '
+            'printf "RESULT<%s>|<%s>|<%s>\\n" "$SELECTED_PACKAGES" "${SELECTED_WEBAPPS//$\'\\n\'/,}" "$SELECTED_NPMCLIS"',
+            INSTALLED_PACKAGES='opencode',
+            FILTER_SELECTION='📦 opencode\n🌐 Grok (shortcut only) ⌨\n⬢ grok')
+        self.assertIn('RESULT<opencode>|<Grok>|<grok>', output)
+        rows = Path(str(self.log) + '.filter').read_text().splitlines()
+        self.assertTrue(any(row.startswith('🌐 Grok (shortcut only) ⌨  Grok is an AI assistant') for row in rows), rows)
+
+    def test_confirmation_lists_descriptions(self):
+        self.packaged.unlink()
+        self.install_mise()
+        output = self.run_bash('main', INSTALLED_PACKAGES='opencode', CONFIRM_RESULT='1',
+                               STUB_PACKAGE_DESCRIPTIONS=json.dumps({'opencode': 'The open source coding agent'}),
+                               FILTER_SELECTION='📦 opencode\n⬢ codex')
+        self.assertRegex(output, r'   • opencode {2,}The open source coding agent\n')
+        self.assertRegex(output, r'   • codex {2,}Codex CLI is a coding agent from OpenAI')
+        self.assertFalse(self.calls('sudo'))
+        self.assertTrue(all(call[1] == '-Qi' or call[1:3] == ['-Rs', '--print'] for call in self.calls('pacman')))
+        self.assertTrue(self.home.joinpath('.local/bin/codex').exists())
+
+    def test_package_descriptions_are_read_unwrapped_in_the_c_locale(self):
+        self.filter_rows('enhanced_select_packages obsidian')
+        self.assertEqual(Path(str(self.log) + '.pacman-env').read_text(), 'LC_ALL=C COLUMNS=0\n')
+        self.assertIn(['pacman', '-Qi', '--', 'obsidian'], self.calls('pacman'))
+
+    def test_wrapped_package_descriptions_are_kept_whole(self):
+        long = 'A powerful knowledge base that works on top of a local folder of plain text Markdown files'
+        environment = {**self.env, 'COLUMNS': '80', 'INSTALLED_PACKAGES': 'obsidian',
+                       'STUB_PACKAGE_DESCRIPTIONS': json.dumps({'obsidian': long})}
+        stub = subprocess.run([str(self.bin / 'pacman'), '-Qi', '--', 'obsidian'], env=environment,
+                              capture_output=True, text=True).stdout
+        self.assertIn('\n' + ' ' * 18 + 'of plain text', stub, 'the fixture wraps like pacman')
+        # COLUMNS=0 alone, then continuation joining alone with forced wrapping.
+        for forced_wrap in ('', '40'):
+            with self.subTest(forced_wrap=forced_wrap):
+                output = self.run_bash('load_package_descriptions obsidian; '
+                                       'printf "<%s>" "${PACKAGE_DESCRIPTIONS[obsidian]}"',
+                                       **{**environment, 'STUB_PACMAN_WRAP': forced_wrap})
+                self.assertEqual(output, '<' + long + '>')
+        output = self.run_bash('load_package_descriptions obsidian; print_confirmation_items package obsidian',
+                               **{**environment, 'COLUMNS': '100'})
+        blurb = re.search(r'   • obsidian {2,}(.*)$', output, re.M).group(1)
+        self.assertTrue(blurb.endswith('…') and long.startswith(blurb[:-1]), blurb)
 
     def test_parse_sections_handles_empty_and_space_names(self):
         output = self.run_bash('parse_sections --webapps-- "Google Photos" --npmclis-- codex; '

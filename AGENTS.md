@@ -45,6 +45,12 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
 app_tokens_for          Maps a package -> newline-delimited commands its keybind
                         references, preserving subcommands (docker compose).
+curated_description_for Official one-liner per webapp/TUI/CLI, keyed by category;
+                        sources in docs/item-descriptions.md.
+load_package_descriptions  Packages use pacman's Description instead: one
+                        LC_ALL=C pacman -Qi call; control characters removed.
+described_row           Pads labels so descriptions share a column and trims them
+                        at a word with … to the terminal width (gum cuts rows).
 find_bindings_in_file   Matches supported single-line Lua/conf bindings; can
                         return line numbers so identical comment text survives.
 find_app_bindings       Matches the user's bindings file.
@@ -56,7 +62,9 @@ cleanup_bindings        Creates a checked, unique backup and atomic replacement;
 
 enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
                         split by "--webapps--"/"--npmclis--" sentinels; prefixed
-                        📦/🌐/⬢ and marked ⌨ if they have a keybind. Sets globals
+                        📦/🌐/⬢, marked ⌨ if they have a keybind, and followed
+                        by an aligned description. Selection maps each returned
+                        row back by exact match. Sets globals
                         SELECTED_PACKAGES / SELECTED_WEBAPPS / SELECTED_NPMCLIS
                         (newline-delimited, to survive names with spaces).
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
@@ -257,6 +265,10 @@ as blocked; do not claim a VM pass from stubbed tests.
   mapping in `cli_packages_for` and verify the full upstream wrapper template.
   A webapp that's added also needs a `webapp_domains_for` entry for binding cleanup to
   find it.
+- Every webapp, TUI, and CLI entry needs a `curated_description_for` line quoted
+  from the project's own one-line description, with its source added to
+  `docs/item-descriptions.md`. Shorten by trimming clauses, never by rewording.
+  Packages need nothing: their pacman description is shown.
 
 ## Agent behaviour
 

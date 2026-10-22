@@ -4,7 +4,7 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="3.0"
+VERSION="3.1"
 
 # Configuration
 # Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
@@ -296,7 +296,8 @@ DEFAULT_NPM_CLIS=(
     "ghui"
     "hunk"
     "muse"
-    # Legacy Hermes wrapper; requires the upstream read-only --owns contract.
+    # Legacy Hermes wrapper from 4.0.3-4.0.4; requires the upstream read-only
+    # --owns contract. 4.0.5+ helpers drop it and retire the wrapper themselves.
     "hermes"
     # Additional Quattro defaults absent from 4.0.4.
     "agy"
@@ -426,7 +427,9 @@ is_npm_cli_installed() {
     [[ "$cmd" != */* && -f "$stub" && -r "$stub" && ! -L "$stub" ]] || return 1
 
     # Hermes has its own upstream ownership contract. --owns only checks the
-    # wrapper marker; --remove would also delete its mise environment.
+    # wrapper marker; --remove would also delete its mise environment. From
+    # 4.0.5 the wrapper is what lets the pending migration retire that
+    # environment, and the helper rejects --owns, so the wrapper is kept.
     if [[ "$cmd" == hermes ]]; then
         command -v omarchy-install-hermes-cli >/dev/null 2>&1 &&
             omarchy-install-hermes-cli --owns >/dev/null 2>&1

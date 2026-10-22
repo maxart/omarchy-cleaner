@@ -90,6 +90,10 @@ sources of truth, in an available clone of the upstream Omarchy repo:
   Omarchy itself considers safely removable; keep `DEFAULT_APPS`' active entries
   aligned with it. It also drops CLI stubs and all webapps/TUIs.
 
+Released `v4.0.x` tags come from a release branch that descends from v4.0.0,
+while `quattro` carries the next feature release. Compare against the tag for the
+version you are claiming; a `quattro` snapshot does not describe a release.
+
 `DEFAULT_APPS` keeps an *active* set (uncommented, the common "I don't want this"
 apps) plus a large *commented* catalogue of every remaining Omarchy default, so a
 user can uncomment to expand the offering. Webapps are matched by `.desktop`

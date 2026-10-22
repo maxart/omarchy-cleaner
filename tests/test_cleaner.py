@@ -815,6 +815,16 @@ class CleanerTests(unittest.TestCase):
                 self.assertEqual(long[len(kept)], ' ', 'trimmed at a word boundary')
                 self.assertIn('Google Photos ⌨', rows[1])
 
+    def test_every_catalogue_label_shares_the_description_column(self):
+        rows = self.filter_rows(
+            'enhanced_select_packages obsidian --webapps-- "${DEFAULT_WEBAPPS[@]}" "${DEFAULT_TUIS[@]}" '
+            '--npmclis-- "${DEFAULT_NPM_CLIS[@]}"', COLUMNS='200')
+        self.assertTrue(any(row.startswith('🌐 Google Messages (shortcut only) ⌨ ') for row in rows), rows)
+        blurbs = [re.split(r'\s{2,}', row, maxsplit=1)[1] for row in rows]
+        starts = {GUM_FILTER_COLUMNS + display_width(row[:len(row) - len(blurb)])
+                  for row, blurb in zip(rows, blurbs)}
+        self.assertEqual(len(starts), 1, 'raise the label cap for a longer catalogue label:\n' + '\n'.join(rows))
+
     def test_narrow_terminal_or_missing_description_keeps_plain_rows(self):
         self.desktop('Google Photos')
         self.install_mise()

@@ -1030,8 +1030,9 @@ enhanced_select_packages() {
         fi
     done
 
-    # One very long label should not push every description off screen.
-    ((label_width > 32)) && label_width=32
+    # 33 fits every catalogue label, up to "Google Messages (shortcut only) ⌨";
+    # one longer custom label should not push every description off screen.
+    ((label_width > 33)) && label_width=33
     local columns
     columns=$(terminal_columns)
     for i in "${!all_items[@]}"; do
@@ -1256,7 +1257,7 @@ print_confirmation_items() {
             width=${#label}
         fi
     done
-    ((width > 32)) && width=32
+    ((width > 33)) && width=33
     columns=$(terminal_columns)
     for i in "${!labels[@]}"; do
         gum style --foreground 214 \

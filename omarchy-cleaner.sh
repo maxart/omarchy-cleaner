@@ -48,6 +48,9 @@ DEFAULT_APPS=(
     "docker"
     "docker-buildx"
     "docker-compose"
+    # Omarchy's Docker firewall rules; it requires docker, so removing docker
+    # without it is refused.
+    "ufw-docker"
     "gpu-screen-recorder"
 
     # No longer in Omarchy 4 base (moved to on-demand installs or replaced).
@@ -223,7 +226,6 @@ DEFAULT_APPS=(
     # "tzupdate"
     # "udiskie"
     # "ufw"
-    # "ufw-docker"
     # "unzip"
     # "usbguard"
     # "usage"
@@ -537,18 +539,23 @@ webapp_domains_for() {
     esac
 }
 
-# Map a package name to the token(s) its keybinding references. Packages and
-# their launch tokens don't always match (1password-beta -> 1password). Docker
+# Map a package name to newline-delimited commands its keybinding references.
+# Keep subcommands intact: removing a Docker plugin must not claim every Docker
+# shortcut. Package and command names can differ (1password-cli -> op). Docker
 # was bound as lazydocker in Omarchy 4.0.0 and as omarchy-launch-docker-tui
 # from 4.0.1 (polkit wrapper after docker-group membership became opt-in).
 app_tokens_for() {
     case "$1" in
-        1password-beta|1password-cli)                         echo "1password" ;;
-        docker|docker-buildx|docker-compose|lazydocker)       echo "docker lazydocker omarchy-launch-docker-tui" ;;
-        moonlight-qt)                                         echo "moonlight" ;;
-        signal-desktop)                                       echo "signal" ;;
-        herdr)                                                echo "herdr terminal-herdr" ;;
-        *)                                                    echo "$1" ;;
+        1password-beta) printf '%s\n' 1password ;;
+        1password-cli)  printf '%s\n' op ;;
+        docker)         printf '%s\n' docker lazydocker omarchy-launch-docker-tui ;;
+        docker-buildx)  printf '%s\n' docker-buildx 'docker buildx' ;;
+        docker-compose) printf '%s\n' docker-compose 'docker compose' ;;
+        Docker|lazydocker) printf '%s\n' lazydocker omarchy-launch-docker-tui ;;
+        moonlight-qt)   printf '%s\n' moonlight ;;
+        signal-desktop) printf '%s\n' signal ;;
+        herdr)          printf '%s\n' herdr terminal-herdr ;;
+        *)              printf '%s\n' "$1" ;;
     esac
 }
 
@@ -582,7 +589,9 @@ find_bindings_in_file() {
     local domains
     domains=$(webapp_domains_for "$app_name")
     local -a tokens
-    read -r -a tokens <<< "$(app_tokens_for "$app_name")"
+    # Preserve the catalogue's case: Docker is a desktop launcher; docker is
+    # the engine package. Removing the launcher must not claim engine commands.
+    readarray -t tokens < <(app_tokens_for "$1")
     local quote="[\"']"
     local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${quote}[^\"']+${quote}[[:space:]]*,[[:space:]]*(${quote}[^\"']*${quote}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${quote}([^\"']+)${quote}[^{}]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
     local legacy='^[[:space:]]*bindd[[:space:]]*=.*,[[:space:]]*exec[[:space:]]*,[[:space:]]*(.*)$'
@@ -1018,6 +1027,66 @@ enhanced_select_packages() {
     return 0
 }
 
+# pacman refuses the whole transaction if an installed package outside the
+# selection still needs a selected one (ufw-docker needs docker). A dry run,
+# which needs no root, names them: keep those and remove the rest. Repeat,
+# since a kept package can in turn need others in the selection. Any other
+# dry-run failure is left for the real transaction to report.
+find_blocked_packages() {
+    REMOVABLE_PACKAGES=("$@")
+    KEPT_PACKAGES=()
+    declare -gA KEPT_REASONS=()
+    local output line package
+    while [[ ${#REMOVABLE_PACKAGES[@]} -gt 0 ]]; do
+        output=$(LC_ALL=C pacman -Rs --print -- "${REMOVABLE_PACKAGES[@]}" 2>&1) && return 0
+        local -A blocked=()
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^::\ removing\ ([^[:space:]]+)\ breaks\ dependency\ .+\ required\ by\ ([^[:space:]]+)$ ]]; then
+                package="${BASH_REMATCH[1]}"
+                blocked["$package"]=1
+                if [[ -n "${KEPT_REASONS[$package]:-}" ]]; then
+                    [[ ", ${KEPT_REASONS[$package]}, " == *", ${BASH_REMATCH[2]}, "* ]] ||
+                        KEPT_REASONS["$package"]+=", ${BASH_REMATCH[2]}"
+                else
+                    KEPT_REASONS["$package"]="${BASH_REMATCH[2]}"
+                fi
+            fi
+        done <<< "$output"
+        [[ ${#blocked[@]} -gt 0 ]] || return 0
+        local -a remaining=()
+        for package in "${REMOVABLE_PACKAGES[@]}"; do
+            if [[ -n "${blocked[$package]:-}" ]]; then
+                KEPT_PACKAGES+=("$package")
+            else
+                remaining+=("$package")
+            fi
+        done
+        # An unexpected diagnostic may name a package outside our selection.
+        # Stop if no selected target was set aside; never repeat the same preview
+        # forever. The real transaction still enforces pacman's dependency checks.
+        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 0
+        REMOVABLE_PACKAGES=("${remaining[@]}")
+    done
+}
+
+print_kept_packages() {
+    [[ ${#KEPT_PACKAGES[@]} -gt 0 ]] || return 0
+    gum style --foreground 214 --bold "⚠ Kept, needed by other installed packages (${#KEPT_PACKAGES[@]}):"
+    local package reason
+    local -a needed_by
+    for package in "${KEPT_PACKAGES[@]}"; do
+        IFS=',' read -r -a needed_by <<< "${KEPT_REASONS[$package]// /}"
+        reason="${needed_by[*]:0:3}"
+        reason="${reason// /, }"
+        if [[ ${#needed_by[@]} -gt 3 ]]; then
+            reason+=" and $((${#needed_by[@]} - 3)) more"
+        fi
+        gum style --foreground 240 "   • $package (required by $reason)"
+    done
+    gum style --foreground 240 --italic "To remove one, also select the packages that need it."
+    echo ""
+}
+
 # Packages are removed together so selected dependencies (e.g. docker-buildx
 # and docker) do not prevent each other from being removed in the wrong order.
 remove_packages() {
@@ -1099,8 +1168,10 @@ remove_items() {
     local pkg_array=("${PARSED_PACKAGES[@]}")
     local webapp_array=("${PARSED_WEBAPPS[@]}")
     local npmcli_array=("${PARSED_NPMCLIS[@]}")
-    local total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]} + ${#npmcli_array[@]}))
-    local total_failed=0 failures=0 binding_failed=false
+    # Packages set aside by find_blocked_packages were selected but not removed.
+    local kept=${#KEPT_PACKAGES[@]}
+    local total_attempted=$((${#pkg_array[@]} + ${#webapp_array[@]} + ${#npmcli_array[@]} + kept))
+    local total_failed=$kept failures=0 binding_failed=false
 
     remove_packages "${pkg_array[@]}"
     failures=$?
@@ -1132,6 +1203,9 @@ remove_items() {
     else
         title="❌ FAILED"; color=196; background=52; status=2
         summary=("Could not complete any selected removals.")
+    fi
+    if [[ "$kept" -gt 0 ]]; then
+        summary+=("Not removed (required by other packages): ${KEPT_PACKAGES[*]}")
     fi
     if [[ "$binding_failed" == true ]]; then
         summary+=("Keyboard shortcut cleanup could not be completed.")
@@ -1238,6 +1312,14 @@ main() {
 
     if [[ -n "$selected_npmcli_lines" ]]; then
         readarray -t npmclis_array <<< "$selected_npmcli_lines"
+    fi
+
+    # Before shortcut and removal prompts, set aside packages that installed
+    # packages outside the selection still need; pacman would refuse them all.
+    KEPT_PACKAGES=()
+    if [[ ${#packages_array[@]} -gt 0 ]]; then
+        find_blocked_packages "${packages_array[@]}"
+        packages_array=("${REMOVABLE_PACKAGES[@]}")
     fi
     
     # Check if any selected items have keyboard shortcuts (user file and/or
@@ -1346,6 +1428,12 @@ main() {
         webapps_array=("${kept_webapps[@]}")
     fi
     if [[ $((${#packages_array[@]} + ${#webapps_array[@]} + ${#npmclis_array[@]})) -eq 0 ]]; then
+        if [[ ${#KEPT_PACKAGES[@]} -gt 0 ]]; then
+            echo ""
+            print_kept_packages
+            gum log --level warn "Nothing was removed"
+            return 1
+        fi
         gum log --level info "No removals selected"
         return 0
     fi
@@ -1403,6 +1491,7 @@ main() {
         done
         echo ""
     fi
+    print_kept_packages
     
     # Show webapps if any
     if [[ ${#webapps_array[@]} -gt 0 ]]; then

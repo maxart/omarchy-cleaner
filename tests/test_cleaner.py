@@ -38,6 +38,24 @@ elif name == 'sudo':
 elif name == 'pacman':
     if args[0] == '-Qi':
         sys.exit(0 if args[1] in os.environ.get('INSTALLED_PACKAGES', '').split() else 1)
+    if args[:2] == ['-Rs', '--print']:
+        # Dry run: report installed packages outside the targets that need one.
+        with open(os.environ['CALL_LOG'] + '.dry-run-locale', 'a') as locale_log:
+            locale_log.write(os.environ.get('LC_ALL', '') + '\n')
+        if os.environ.get('STUB_DRY_RUN_ERROR'):
+            print('error: ' + os.environ['STUB_DRY_RUN_ERROR'], file=sys.stderr)
+            sys.exit(1)
+        targets = args[args.index('--') + 1:]
+        required_by = json.loads(os.environ.get('STUB_REQUIRED_BY', '{}'))
+        broken = [(target, needer) for target in targets
+                  for needer in required_by.get(target, []) if needer not in targets]
+        if broken:
+            print('error: failed to prepare transaction (could not satisfy dependencies)', file=sys.stderr)
+            for target, needer in broken:
+                print(f":: removing {target} breaks dependency '{target}' required by {needer}", file=sys.stderr)
+            sys.exit(1)
+        print('\n'.join(target + '-1.0-1' for target in targets))
+        sys.exit(0)
     sys.exit(int(os.environ.get('PACMAN_RESULT', '0')))
 elif name in ('omarchy-webapp-remove', 'omarchy-tui-remove'):
     result = int(os.environ.get('HELPER_RESULT', '0'))
@@ -79,9 +97,10 @@ class CleanerTests(unittest.TestCase):
                     'PATH': str(self.bin) + ':/usr/bin:/bin', 'CALL_LOG': str(self.log),
                     'LC_ALL': 'C.UTF-8'}
 
-    def run_bash(self, code, expected=0, **environment):
+    def run_bash(self, code, expected=0, timeout=30, **environment):
         result = subprocess.run(['bash', '-c', 'source "$1"\n' + code, 'test', str(SCRIPT)],
-                                env={**self.env, **environment}, capture_output=True, text=True)
+                                env={**self.env, **environment}, capture_output=True, text=True,
+                                timeout=timeout)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result.stdout
 
@@ -114,7 +133,7 @@ class CleanerTests(unittest.TestCase):
                     self.run_bash('is_npm_cli_installed ' + cli['command'])
             offered = set(self.run_bash('get_installed_npm_clis').splitlines())
             self.assertFalse({cli['command'] for cli in source['clis']} - offered)
-        self.assertTrue({'ghostty', 'alacritty', 'opencode', '1password-beta'} <= active)
+        self.assertTrue({'ghostty', 'alacritty', 'opencode', '1password-beta', 'ufw-docker'} <= active)
 
     def test_v404_cli_selection_removes_only_selected_wrapper(self):
         self.packaged.unlink()
@@ -523,6 +542,168 @@ class CleanerTests(unittest.TestCase):
         self.assertIn('SUPER + SHIFT + P', self.bindings.read_text())
         self.assertNotIn('SUPER + SHIFT + O', self.bindings.read_text())
 
+    def test_blocked_package_is_kept_and_the_rest_removed(self):
+        self.packaged.unlink()
+        output = self.run_bash('main', expected=1, INSTALLED_PACKAGES='docker obsidian',
+                               STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+                               FILTER_SELECTION='📦 docker\n📦 obsidian', CONFIRM_RESULT='0')
+        removals = [call for call in self.calls('pacman') if call[1] == '-Rns']
+        self.assertEqual(removals, [['pacman', '-Rns', '--noconfirm', '--', 'obsidian']])
+        self.assertIn('docker (required by ufw-docker)', output)
+        self.assertIn('Ready to remove 1 item(s)', output)
+        self.assertIn('PARTIAL SUCCESS', output)
+        self.assertIn('Completed 1 of 2 selected removal(s).', output)
+        self.assertIn('Not removed (required by other packages): docker', output)
+        self.assertFalse([call for call in self.calls('sudo') if '--print' in call], 'dry run needs no root')
+        self.assertEqual(Path(str(self.log) + '.dry-run-locale').read_text(), 'C\nC\n')
+
+    def test_packages_needed_by_kept_packages_are_kept_too(self):
+        output = self.run_bash(
+            'find_blocked_packages docker containerd obsidian; printf "<%s>|<%s>|<%s>|<%s>\\n" '
+            '"${REMOVABLE_PACKAGES[*]}" "${KEPT_PACKAGES[*]}" "${KEPT_REASONS[docker]}" "${KEPT_REASONS[containerd]}"',
+            STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker', 'once-bin'], 'containerd': ['docker']}))
+        self.assertIn('<obsidian>|<docker containerd>|<ufw-docker, once-bin>|<docker>', output)
+        self.assertFalse(self.calls('sudo'))
+
+    def check_docker_plugin_partial_removal(self, legacy=False):
+        if legacy:
+            self.bindings.unlink()
+            self.bindings = self.bindings.with_suffix('.conf')
+        for plugin, command in [('docker-compose', 'docker compose'),
+                                ('docker-buildx', 'docker buildx')]:
+            with self.subTest(plugin=plugin, legacy=legacy):
+                if legacy:
+                    docker = 'bindd = SUPER SHIFT, D, Docker, exec, omarchy-launch-tui lazydocker\n'
+                    plugin_binding = f'bindd = SUPER, P, Plugin, exec, omarchy-launch-tui {command} version\n'
+                    obsidian = 'bindd = SUPER SHIFT, O, Notes, exec, uwsm-app -- obsidian\n'
+                else:
+                    docker = 'o.bind("SUPER + SHIFT + D", "Docker", { tui = "omarchy-launch-docker-tui" })\n'
+                    plugin_binding = f'o.bind("SUPER + P", "Plugin", {{ tui = "{command} version" }})\n'
+                    obsidian = 'o.bind("SUPER + SHIFT + O", "Notes", { launch = "obsidian" })\n'
+                original = docker + plugin_binding + obsidian
+                self.bindings.write_text(original)
+                self.log.unlink(missing_ok=True)
+                previous_backups = set(self.bindings.parent.glob('*.backup.*'))
+                output = self.run_bash(
+                    'main', expected=1, INSTALLED_PACKAGES=f'docker {plugin} obsidian',
+                    STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+                    FILTER_SELECTION=f'📦 docker ⌨\n📦 {plugin} ⌨\n📦 obsidian ⌨',
+                    CONFIRM_RESULT='0')
+                removals = [call for call in self.calls('pacman') if call[1] == '-Rns']
+                self.assertEqual(removals, [['pacman', '-Rns', '--noconfirm', '--', plugin, 'obsidian']])
+                result = self.bindings.read_text()
+                self.assertIn(docker, result)
+                self.assertNotIn(plugin_binding, result)
+                self.assertNotIn(obsidian, result)
+                self.assertNotIn('hl.unbind("SUPER + SHIFT + D")', result)
+                if not legacy:
+                    self.assertIn('hl.unbind("SUPER + SHIFT + O")', result)
+                backups = set(self.bindings.parent.glob('*.backup.*')) - previous_backups
+                self.assertEqual(len(backups), 1)
+                self.assertEqual(backups.pop().read_text(), original)
+                self.assertIn('Not removed (required by other packages): docker', output)
+                self.assertIn('Completed 2 of 3 selected removal(s).', output)
+
+    def test_docker_plugins_preserve_kept_docker_shortcuts(self):
+        self.check_docker_plugin_partial_removal()
+
+    def test_docker_plugins_preserve_kept_docker_legacy_shortcuts(self):
+        self.check_docker_plugin_partial_removal(legacy=True)
+
+    def test_plugin_command_matches_do_not_claim_other_docker_commands(self):
+        commands = ['docker', 'docker ps', 'lazydocker', 'omarchy-launch-docker-tui',
+                    'docker-compose up', 'docker compose up', 'docker compose-extra',
+                    'docker-buildx version', 'docker buildx version', 'docker buildx-extra']
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                if legacy:
+                    lines = [f'bindd = SUPER, {i}, Tool, exec, omarchy-launch-tui {cmd}'
+                             for i, cmd in enumerate(commands)]
+                else:
+                    lines = [f'o.bind("SUPER + {i}", "Tool", {{ tui = "{cmd}" }})'
+                             for i, cmd in enumerate(commands)]
+                self.bindings.write_text('\n'.join(lines) + '\n')
+                for package, indices in [('docker-compose', (4, 5)), ('docker-buildx', (7, 8)),
+                                         ('lazydocker', (2, 3))]:
+                    self.assertEqual(self.run_bash('find_app_bindings ' + package).splitlines(),
+                                     [lines[i] for i in indices])
+
+    def test_1password_cli_removal_preserves_gui_shortcuts(self):
+        gui = 'o.bind("SUPER + SHIFT + SLASH", "Passwords", { omarchy = "1password" })\n'
+        cli = 'o.bind("SUPER + P", "Vault CLI", { tui = "op item list" })\n'
+        self.bindings.write_text(gui + cli)
+        self.run_bash('REMOVE_BINDINGS=true; remove_items 1password-cli')
+        self.assertEqual(self.bindings.read_text(), gui)
+        self.assertEqual(next(self.bindings.parent.glob('*.backup.*')).read_text(), gui + cli)
+
+    def test_docker_and_blocker_can_be_removed_together(self):
+        output = self.run_bash(
+            'main', INSTALLED_PACKAGES='docker ufw-docker',
+            STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+            FILTER_SELECTION='📦 docker ⌨\n📦 ufw-docker', CONFIRM_RESULT='0')
+        removals = [call for call in self.calls('pacman') if call[1] == '-Rns']
+        self.assertEqual(removals, [['pacman', '-Rns', '--noconfirm', '--', 'docker', 'ufw-docker']])
+        self.assertIn('Completed all 2 selected removal(s).', output)
+        self.assertIn('hl.unbind("SUPER + SHIFT + D")', self.bindings.read_text())
+
+    def test_selected_docker_launcher_keeps_retained_engine_shortcuts(self):
+        desktop = self.desktop('Docker')
+        engine = 'o.bind("SUPER + E", "Containers", { tui = "docker ps" })\n'
+        tui = 'o.bind("SUPER + SHIFT + D", "Docker", { tui = "omarchy-launch-docker-tui" })\n'
+        self.bindings.write_text(engine + tui)
+        output = self.run_bash(
+            'main', expected=1, INSTALLED_PACKAGES='docker',
+            STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+            FILTER_SELECTION='📦 docker ⌨\n🌐 Docker ⌨', CONFIRM_RESULT='0')
+        self.assertFalse(desktop.exists())
+        self.assertEqual(self.calls('omarchy-tui-remove'), [['omarchy-tui-remove', 'Docker']])
+        self.assertFalse([call for call in self.calls('pacman') if call[1] == '-Rns'])
+        self.assertFalse(self.calls('sudo'))
+        self.assertIn(engine, self.bindings.read_text())
+        self.assertNotIn(tui, self.bindings.read_text())
+        self.assertIn('hl.unbind("SUPER + SHIFT + D")', self.bindings.read_text())
+        self.assertIn('Completed 1 of 2 selected removal(s).', output)
+
+    def test_blocked_package_cancellation_and_sudo_failure_keep_shortcuts(self):
+        original = 'o.bind("SUPER + SHIFT + O", "Notes", { launch = "obsidian" })\n'
+        for confirm, sudo, status in [('1', '0', 0), ('0', '1', 2)]:
+            with self.subTest(confirm=confirm, sudo=sudo):
+                self.bindings.write_text(original)
+                self.log.unlink(missing_ok=True)
+                self.run_bash('main', expected=status, INSTALLED_PACKAGES='docker obsidian',
+                              STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+                              FILTER_SELECTION='📦 docker ⌨\n📦 obsidian ⌨',
+                              CONFIRM_RESULT=confirm, SUDO_RESULT=sudo)
+                self.assertFalse([call for call in self.calls('pacman') if call[1] == '-Rns'])
+                self.assertEqual(self.bindings.read_text(), original)
+                self.assertFalse(list(self.bindings.parent.glob('*.backup.*')))
+
+    def test_unexpected_dependency_diagnostic_cannot_loop_forever(self):
+        output = self.run_bash('find_blocked_packages obsidian; '
+                               'printf "<%s>|<%s>\\n" "${REMOVABLE_PACKAGES[*]}" "${KEPT_PACKAGES[*]}"',
+                               timeout=3, STUB_DRY_RUN_ERROR="could not satisfy dependencies\n"
+                               ":: removing unselected-dependency breaks dependency 'library' required by consumer")
+        self.assertIn('<obsidian>|<>', output)
+        self.assertEqual(len(self.calls('pacman')), 1)
+        self.assertFalse(self.calls('sudo'))
+
+    def test_only_blocked_packages_removes_nothing(self):
+        self.packaged.unlink()
+        output = self.run_bash('main', expected=1, INSTALLED_PACKAGES='docker',
+                               STUB_REQUIRED_BY=json.dumps({'docker': ['ufw-docker']}),
+                               FILTER_SELECTION='📦 docker', CONFIRM_RESULT='0')
+        self.assertIn('docker (required by ufw-docker)', output)
+        self.assertIn('Nothing was removed', output)
+        self.assertNotIn('CONFIRMATION REQUIRED', output)
+        self.assertFalse(self.calls('sudo'))
+        self.assertFalse([call for call in self.calls('pacman') if call[1] == '-Rns'])
+
+    def test_unexplained_dry_run_failure_leaves_the_selection_to_pacman(self):
+        output = self.run_bash('find_blocked_packages docker obsidian; '
+                               'printf "<%s>|<%s>\\n" "${REMOVABLE_PACKAGES[*]}" "${KEPT_PACKAGES[*]}"',
+                               STUB_DRY_RUN_ERROR='target not found: docker')
+        self.assertIn('<docker obsidian>|<>', output)
+
     def test_shortcut_only_requires_consent(self):
         self.run_bash('remove_items --webapps-- ChatGPT', expected=2)
         self.assertEqual(self.bindings.read_text(), '')
@@ -568,7 +749,7 @@ class CleanerTests(unittest.TestCase):
         self.packaged.unlink()
         self.run_bash('main', INSTALLED_PACKAGES='opencode', FILTER_SELECTION='📦 opencode')
         self.assertFalse(self.calls('sudo'))
-        self.assertTrue(all(call[1] == '-Qi' for call in self.calls('pacman')))
+        self.assertTrue(all(call[1] == '-Qi' or call[1:3] == ['-Rs', '--print'] for call in self.calls('pacman')))
         self.assertEqual(self.bindings.read_text(), '')
 
     def test_selector_cancellation_has_no_mutations(self):

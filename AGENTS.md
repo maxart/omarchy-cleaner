@@ -43,8 +43,8 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
                         by both the selector and the remover.
 
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
-app_tokens_for          Maps a package -> the token(s) its keybind references
-                        (1password-beta -> 1password; docker* -> docker lazydocker).
+app_tokens_for          Maps a package -> newline-delimited commands its keybind
+                        references, preserving subcommands (docker compose).
 find_bindings_in_file   Matches supported single-line Lua/conf bindings; can
                         return line numbers so identical comment text survives.
 find_app_bindings       Matches the user's bindings file.
@@ -62,10 +62,14 @@ enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
                         shortcut-only selections require cleanup consent.
 remove_npm_clis         Rechecks ownership and deletes selected stubs (no sudo).
+find_blocked_packages   Rootless `pacman -Rs --print` dry run; sets aside selected
+                        packages still required by installed ones outside the
+                        selection (ufw-docker -> docker), so the rest can go.
 remove_packages         Acquires sudo, removes selected packages in one transaction.
 remove_items            parse_sections, all three removers, then binding cleanup
                         only for successful removals, followed by the hero box.
-main                    Banner → scan → select → keybind prompt → confirm → remove.
+main                    Banner → scan → select → dry run → keybind prompt → confirm
+                        → remove.
 ```
 
 Runtime code is self-contained in this file. Regression tests live in `tests/`
@@ -132,6 +136,9 @@ keep the extra reach.
 The script runs unprivileged. Only `pacman -Rns` needs root, so `remove_packages`
 prompts for `sudo` once up front (`sudo -n true` check, then `sudo true`) and
 reuses the cached credential for one transaction containing all selected packages.
+Before that, `find_blocked_packages` runs a `pacman -Rs --print` dry run without
+sudo; packages it reports as still required are kept and explained, never
+removed by also removing their dependents.
 Webapp/TUI removal, CLI-wrapper deletion, and
 binding edits are all in the user's `$HOME` and never touch root. Keep this split
 — do not run the whole script under sudo.
@@ -169,8 +176,12 @@ shortcuts. Never edit packaged config or disable every preinstall binding.
 - **.conf**: `bindd = ..., exec, <launcher> ...` (`uwsm-app --`,
   `omarchy-launch-or-focus`, `omarchy-launch-tui`, `omarchy-launch-webapp`, etc.).
 
-Native apps are matched via `app_tokens_for` (handles `1password-*` → `1password`
-and `docker*` → `docker`/`lazydocker`); webapps via `webapp_domains_for` (the
+Native apps are matched via `app_tokens_for` (`1password-cli` → `op`, Docker
+plugins → their own commands/subcommands). Removing a plugin must preserve
+Docker/lazydocker shortcuts; removing the CLI must preserve 1Password GUI
+shortcuts. Keep the exact catalogue case when mapping commands: the `Docker`
+desktop launcher must not claim the `docker` engine's bindings. Webapps are
+matched via `webapp_domains_for` (the
 binding must invoke a webapp launcher *and* carry a URL on a matching domain).
 Removal uses matched line numbers and leaves multiline/computed Lua alone.
 Long comments and strings are skipped using their exact delimiters. Webapp URLs

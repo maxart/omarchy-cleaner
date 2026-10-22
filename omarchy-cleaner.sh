@@ -648,17 +648,49 @@ item_description() {
     esac
 }
 
+# Whether a character takes two terminal cells: East Asian wide and fullwidth
+# ranges (CJK, Hangul, fullwidth forms) plus symbol and emoji blocks. Counting
+# a narrow symbol as wide only trims a description slightly more.
+is_wide_char() {
+    local code
+    printf -v code '%d' "'$1"
+    ((code >= 0x1100 && (code <= 0x115f || code == 0x2329 || code == 0x232a ||
+        (code >= 0x2600 && code <= 0x27bf) ||
+        (code >= 0x2e80 && code <= 0xa4cf && code != 0x303f) ||
+        (code >= 0xac00 && code <= 0xd7a3) || (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xfe10 && code <= 0xfe19) || (code >= 0xfe30 && code <= 0xfe6f) ||
+        (code >= 0xff00 && code <= 0xff60) || (code >= 0xffe0 && code <= 0xffe6) ||
+        (code >= 0x1f000 && code <= 0x1faff) || (code >= 0x20000 && code <= 0x3fffd))))
+}
+
 # gum cuts rows at the terminal edge without an ellipsis, so trim to a word.
+# Width is in terminal cells, not characters.
 fit_description() {
     local text="$1" width="$2"
     [[ -n "$text" && "$width" -ge 12 ]] || return 0
-    if [[ ${#text} -le $width ]]; then
+    # Find the first character past width - 1 cells, leaving one for the ellipsis.
+    local i cells=0 cut=-1
+    for ((i = 0; i < ${#text}; i++)); do
+        if is_wide_char "${text:i:1}"; then
+            cells=$((cells + 2))
+        else
+            cells=$((cells + 1))
+        fi
+        ((cut < 0 && cells > width - 1)) && cut=$i
+        ((cells > width)) && break
+    done
+    if ((cells <= width)); then
         printf '%s' "$text"
         return 0
     fi
-    text="${text:0:width-1}"
-    [[ "$text" == *" "* ]] && text="${text% *}"
-    while [[ "$text" == *[[:space:],\;:—-] ]]; do
+    local next="${text:cut:1}"
+    text="${text:0:cut}"
+    # CJK needs no spaces, so a wide character on either side is a break too.
+    if [[ "$next" != " " ]] && ! is_wide_char "$next" && ! is_wide_char "${text: -1}" &&
+        [[ "$text" == *" "* ]]; then
+        text="${text% *}"
+    fi
+    while [[ "$text" == *[[:space:],\;:—，、。：；-] ]]; do
         text="${text%?}"
     done
     printf '%s…' "$text"

@@ -5,7 +5,7 @@ The selector and final confirmation show a one-line description next to each ite
 - **Packages** show their pacman `Description` (the package's `pkgdesc`), read at runtime with one `LC_ALL=C pacman -Qi` call. Nothing here needs updating when packages are added or uncommented.
 - **Webapps, TUIs, and CLI wrappers** have no local description. `curated_description_for` holds each project's own one-line description, with the sources listed below.
 
-Descriptions are plain text. Control characters are removed before display, and each row is trimmed at a word boundary with `…` to fit the terminal. Without room, or without a description, a row looks exactly as it did before.
+Descriptions are plain text. Control characters are removed before display, and each row is trimmed with `…` to fit the terminal, measured in cells so wide CJK text fits too. Trimming stops at a word boundary, or between CJK characters. Without room, or without a description, a row looks exactly as it did before.
 
 ## Rules for curated text
 

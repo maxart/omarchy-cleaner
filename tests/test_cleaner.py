@@ -825,6 +825,24 @@ class CleanerTests(unittest.TestCase):
                   for row, blurb in zip(rows, blurbs)}
         self.assertEqual(len(starts), 1, 'raise the label cap for a longer catalogue label:\n' + '\n'.join(rows))
 
+    def test_wide_descriptions_are_trimmed_to_terminal_cells(self):
+        # CJK characters take two cells each, and break without spaces.
+        cjk = '基于本地纯文本文件夹的强大知识库，支持双向链接、图谱视图和丰富的社区插件生态系统'
+        for wide, columns in ((text, columns) for text in (cjk, 'Obsidian ' + cjk) for columns in (40, 80)):
+            environment = {'INSTALLED_PACKAGES': 'obsidian',
+                           'STUB_PACKAGE_DESCRIPTIONS': json.dumps({'obsidian': wide})}
+            with self.subTest(description=wide[:9], columns=columns):
+                row, = self.filter_rows('enhanced_select_packages obsidian', COLUMNS=str(columns), **environment)
+                output = self.run_bash('load_package_descriptions obsidian; print_confirmation_items package obsidian',
+                                       COLUMNS=str(columns), **environment)
+                confirmation = output.split('style --foreground 214 ', 1)[1].rstrip('\n')
+                for line, used in ((row, GUM_FILTER_COLUMNS + display_width(row)),
+                                   (confirmation, display_width(confirmation))):
+                    blurb = re.split(r'\s{2,}', line.lstrip(), maxsplit=1)[1]
+                    self.assertTrue(blurb.endswith('…') and wide.startswith(blurb[:-1]), line)
+                    self.assertLessEqual(used, columns, line)
+                    self.assertGreaterEqual(used, columns - 4, 'trimmed back to the space: ' + line)
+
     def test_narrow_terminal_or_missing_description_keeps_plain_rows(self):
         self.desktop('Google Photos')
         self.install_mise()

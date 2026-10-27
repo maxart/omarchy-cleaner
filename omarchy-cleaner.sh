@@ -22,6 +22,8 @@ fi
 REMOVE_BINDINGS=false
 # Package name -> pacman description, filled by load_package_descriptions.
 declare -A PACKAGE_DESCRIPTIONS=()
+PLANNED_PACKAGES=()
+PACKAGE_PLAN_READY=false
 
 # App
 # List from: https://github.com/omacom/omarchy/blob/quattro/install/omarchy-base.packages
@@ -561,51 +563,51 @@ app_tokens_for() {
     esac
 }
 
-# Each project's own one-line description, for items with no local metadata.
-# Packages use their pacman description instead. Sources and trimming rules:
+# Short functional descriptions for items with no local metadata.
+# Packages use their pacman description instead. Sources and editing guidance:
 # docs/item-descriptions.md. The category keeps Grok/grok and HEY/hey apart.
 curated_description_for() {
     case "$1:$2" in
-        "webapp:HEY")             echo "A delightfully fresh take on email + calendar, from 37signals" ;;
-        "webapp:Basecamp")        echo "Basecamp puts everything you need to get work done in one place" ;;
-        "webapp:WhatsApp")        echo "Simple, reliable, private messaging and calling for free" ;;
-        "webapp:Google Photos")   echo "Edit, Organize, Search, and Backup Your Photos" ;;
-        "webapp:Google Contacts") echo "Save names, email addresses, phone numbers, and more" ;;
-        "webapp:Google Messages") echo "A simple, helpful text messaging app" ;;
-        "webapp:Google Maps")     echo "Google Maps is your ultimate guide to explore and navigate the world" ;;
-        "webapp:YouTube")         echo "Enjoy the videos and music you love, upload original content" ;;
-        "webapp:X")               echo "From breaking news and entertainment to sports and politics, get the full story" ;;
-        "webapp:Zoom")            echo "Zoom's trusted collaboration tools: including video meetings, Zoom Chat, VoIP phone, webinars" ;;
-        "webapp:Discord")         echo "Group Chat That’s All Fun & Games" ;;
-        "webapp:Grok")            echo "Grok is an AI assistant" ;;
-        "webapp:ChatGPT")         echo "ChatGPT helps you get answers, find inspiration, and be more productive" ;;
-        "webapp:GitHub")          echo "The world's most widely adopted, AI-powered developer platform" ;;
-        "webapp:Figma")           echo "Figma is the canvas where design, code, and AI come together" ;;
-        "webapp:Fizzy")           echo "A refreshing take on cards, columns, and kanban" ;;
-        "webapp:Docker")          echo "A simple terminal UI for docker and docker-compose" ;;
-        "webapp:Disk Usage")      echo "View disk space usage and delete unwanted data, fast" ;;
-        "npmcli:codex")           echo "Codex CLI is a coding agent from OpenAI that runs locally on your computer" ;;
-        "npmcli:claude")          echo "Use Claude, Anthropic's AI assistant, right from your terminal" ;;
-        "npmcli:crush")           echo "The glamourous AI coding agent for your favourite terminal" ;;
-        "npmcli:gemini")          echo "An open-source AI agent that brings the power of Gemini directly into your terminal" ;;
-        "npmcli:gh")              echo "GitHub’s official command line tool" ;;
-        "npmcli:copilot")         echo "GitHub Copilot CLI brings the power of Copilot coding agent directly to your terminal" ;;
-        "npmcli:opencode")        echo "The open source coding agent" ;;
+        "webapp:HEY")             echo "Email and calendar" ;;
+        "webapp:Basecamp")        echo "Project management and team collaboration" ;;
+        "webapp:WhatsApp")        echo "Messaging and voice/video calls" ;;
+        "webapp:Google Photos")   echo "Photo storage, search and editing" ;;
+        "webapp:Google Contacts") echo "Address book" ;;
+        "webapp:Google Messages") echo "Text messaging" ;;
+        "webapp:Google Maps")     echo "Maps and directions" ;;
+        "webapp:YouTube")         echo "Video sharing and streaming" ;;
+        "webapp:X")               echo "Social network and news" ;;
+        "webapp:Zoom")            echo "Video meetings and team chat" ;;
+        "webapp:Discord")         echo "Community text, voice and video chat" ;;
+        "webapp:Grok")            echo "AI chat assistant" ;;
+        "webapp:ChatGPT")         echo "AI chat assistant" ;;
+        "webapp:GitHub")          echo "Code hosting and collaboration" ;;
+        "webapp:Figma")           echo "Interface design and collaboration" ;;
+        "webapp:Fizzy")           echo "Kanban boards" ;;
+        "webapp:Docker")          echo "Docker container management in a terminal" ;;
+        "webapp:Disk Usage")      echo "Disk usage viewer" ;;
+        "npmcli:codex")           echo "OpenAI coding agent" ;;
+        "npmcli:claude")          echo "Anthropic coding agent" ;;
+        "npmcli:crush")           echo "Terminal coding agent" ;;
+        "npmcli:gemini")          echo "Google coding agent" ;;
+        "npmcli:gh")              echo "GitHub command-line interface" ;;
+        "npmcli:copilot")         echo "GitHub coding agent" ;;
+        "npmcli:opencode")        echo "Open-source coding agent" ;;
         "npmcli:playwright"|"npmcli:playwright-cli")
-                                  echo "A high-level API to automate web browsers" ;;
-        "npmcli:pi")              echo "Coding agent CLI with read, bash, edit, write tools and session management" ;;
-        "npmcli:omp")             echo "Coding agent with the IDE wired in" ;;
-        "npmcli:grok")            echo "Bring Grok into your terminal" ;;
-        "npmcli:cursor-agent")    echo "Cursor CLI — Run Agents in Terminal" ;;
-        "npmcli:ghui")            echo "Terminal UI for GitHub pull requests" ;;
-        "npmcli:hunk")            echo "Review-first terminal diff viewer for agentic coders" ;;
-        "npmcli:muse")            echo "Muse Code is the coding agent built to run Muse Spark 1.2" ;;
-        "npmcli:hermes")          echo "Hermes Agent is the open-source, self-hosted AI agent by Nous Research" ;;
-        "npmcli:agy")             echo "Google Antigravity CLI companion" ;;
-        "npmcli:hey")             echo "HEY CLI and Agent Skills" ;;
-        "npmcli:basecamp")        echo "The official command-line interface for Basecamp" ;;
-        "npmcli:cf")              echo "The agentic CLI for the entire Cloudflare API" ;;
-        "npmcli:ori")             echo "OpenRouter's CLI for working with projects you already have" ;;
+                                  echo "Browser automation" ;;
+        "npmcli:pi")              echo "Terminal coding agent" ;;
+        "npmcli:omp")             echo "Coding agent with IDE tools" ;;
+        "npmcli:grok")            echo "Grok terminal assistant" ;;
+        "npmcli:cursor-agent")    echo "Cursor coding agent" ;;
+        "npmcli:ghui")            echo "GitHub pull requests in a terminal" ;;
+        "npmcli:hunk")            echo "Terminal diff viewer" ;;
+        "npmcli:muse")            echo "Meta coding agent" ;;
+        "npmcli:hermes")          echo "Self-hosted AI agent" ;;
+        "npmcli:agy")             echo "Google Antigravity terminal companion" ;;
+        "npmcli:hey")             echo "HEY command-line interface" ;;
+        "npmcli:basecamp")        echo "Basecamp command-line interface" ;;
+        "npmcli:cf")              echo "Cloudflare API command-line interface" ;;
+        "npmcli:ori")             echo "OpenRouter command-line interface" ;;
     esac
 }
 
@@ -648,54 +650,6 @@ item_description() {
     esac
 }
 
-# Whether a character takes two terminal cells: East Asian wide and fullwidth
-# ranges (CJK, Hangul, fullwidth forms) plus symbol and emoji blocks. Counting
-# a narrow symbol as wide only trims a description slightly more.
-is_wide_char() {
-    local code
-    printf -v code '%d' "'$1"
-    ((code >= 0x1100 && (code <= 0x115f || code == 0x2329 || code == 0x232a ||
-        (code >= 0x2600 && code <= 0x27bf) ||
-        (code >= 0x2e80 && code <= 0xa4cf && code != 0x303f) ||
-        (code >= 0xac00 && code <= 0xd7a3) || (code >= 0xf900 && code <= 0xfaff) ||
-        (code >= 0xfe10 && code <= 0xfe19) || (code >= 0xfe30 && code <= 0xfe6f) ||
-        (code >= 0xff00 && code <= 0xff60) || (code >= 0xffe0 && code <= 0xffe6) ||
-        (code >= 0x1f000 && code <= 0x1faff) || (code >= 0x20000 && code <= 0x3fffd))))
-}
-
-# gum cuts rows at the terminal edge without an ellipsis, so trim to a word.
-# Width is in terminal cells, not characters.
-fit_description() {
-    local text="$1" width="$2"
-    [[ -n "$text" && "$width" -ge 12 ]] || return 0
-    # Find the first character past width - 1 cells, leaving one for the ellipsis.
-    local i cells=0 cut=-1
-    for ((i = 0; i < ${#text}; i++)); do
-        if is_wide_char "${text:i:1}"; then
-            cells=$((cells + 2))
-        else
-            cells=$((cells + 1))
-        fi
-        ((cut < 0 && cells > width - 1)) && cut=$i
-        ((cells > width)) && break
-    done
-    if ((cells <= width)); then
-        printf '%s' "$text"
-        return 0
-    fi
-    local next="${text:cut:1}"
-    text="${text:0:cut}"
-    # CJK needs no spaces, so a wide character on either side is a break too.
-    if [[ "$next" != " " ]] && ! is_wide_char "$next" && ! is_wide_char "${text: -1}" &&
-        [[ "$text" == *" "* ]]; then
-        text="${text% *}"
-    fi
-    while [[ "$text" == *[[:space:],\;:—，、。：；-] ]]; do
-        text="${text%?}"
-    done
-    printf '%s…' "$text"
-}
-
 # An exported COLUMNS wins, so callers and tests can pin the layout width.
 terminal_columns() {
     local size columns
@@ -707,23 +661,6 @@ terminal_columns() {
         columns=80
     fi
     printf '%s\n' "$columns"
-}
-
-# Pad a label so descriptions start at one display column, then fit the
-# description into what is left of the row. lead_columns is where the label
-# starts on screen. Without a description the row is just lead and label.
-described_row() {
-    local lead="$1" lead_columns="$2" label="$3" description="$4" target="$5" columns="$6"
-    local used=$((lead_columns + ${#label}))
-    local pad=$((target - used))
-    ((pad < 2)) && pad=2
-    local blurb
-    blurb=$(fit_description "$description" $((columns - used - pad - 1)))
-    if [[ -n "$blurb" ]]; then
-        printf '%s%s%*s%s\n' "$lead" "$label" "$pad" '' "$blurb"
-    else
-        printf '%s%s\n' "$lead" "$label"
-    fi
 }
 
 # A line-oriented matcher cannot safely interpret mixed Lua string expressions.
@@ -759,8 +696,13 @@ find_bindings_in_file() {
     # Preserve the catalogue's case: Docker is a desktop launcher; docker is
     # the engine package. Removing the launcher must not claim engine commands.
     readarray -t tokens < <(app_tokens_for "$1")
-    local quote="[\"']"
-    local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${quote}[^\"']+${quote}[[:space:]]*,[[:space:]]*(${quote}[^\"']*${quote}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${quote}([^\"']+)${quote}[^{}]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
+    # Accept only literal commands and the optional literal focus field used by
+    # Omarchy. An arbitrary tail can change the command ("obsidian" .. suffix),
+    # override it with a second dispatcher, or evaluate an unrelated function.
+    # Escaped strings and other table fields are left for manual cleanup.
+    local literal="(\"[^\"\\\\]*\"|'[^'\\\\]*')"
+    local focus="(,[[:space:]]*focus[[:space:]]*=[[:space:]]*(${literal}|true|false)[[:space:]]*)?"
+    local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${literal}[[:space:]]*,[[:space:]]*(${literal}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${literal}[[:space:]]*${focus},?[[:space:]]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
     local legacy='^[[:space:]]*bindd[[:space:]]*=.*,[[:space:]]*exec[[:space:]]*,[[:space:]]*(.*)$'
     local line action command token host domain matched_line
     local line_number=0
@@ -780,8 +722,9 @@ find_bindings_in_file() {
         action=""
         command=""
         if [[ "$line" =~ $lua ]]; then
-            action="${BASH_REMATCH[2]}"
-            command="${BASH_REMATCH[3]}"
+            action="${BASH_REMATCH[4]}"
+            command="${BASH_REMATCH[5]}"
+            command="${command:1:${#command}-2}"
         elif [[ "$line" =~ $legacy ]]; then
             command="${BASH_REMATCH[1]}"
             [[ "$command" == omarchy-launch-webapp\ * || "$command" == omarchy-launch-or-focus-webapp\ * ]] && action=webapp
@@ -1025,17 +968,13 @@ enhanced_select_packages() {
         item_types+=("npmcli")
     done
 
-    # Build display items with type indicators, binding markers, and descriptions
-    load_package_descriptions "${PARSED_PACKAGES[@]}"
-    local prefixes=() lead_columns=() labels=() descriptions=()
-    local label_width=0
+    # Build display items with type indicators and binding markers
     for i in "${!all_items[@]}"; do
-        # gum's indicator and selection prefix take five columns. 📦 and 🌐 are
-        # two columns wide and ⬢ is one, so labels start at column 8 or 7.
+        local prefix=""
         case "${item_types[$i]}" in
-            webapp) prefixes[i]="🌐 "; lead_columns[i]=8 ;;
-            npmcli) prefixes[i]="⬢ "; lead_columns[i]=7 ;;
-            *)      prefixes[i]="📦 "; lead_columns[i]=8 ;;
+            webapp) prefix="🌐 " ;;
+            npmcli) prefix="⬢ " ;;
+            *)      prefix="📦 " ;;
         esac
 
         # Check if this item has keyboard bindings (CLI stubs have none)
@@ -1049,27 +988,13 @@ enhanced_select_packages() {
                 item_bindings="yes"
             fi
         fi
-        labels[i]="${all_items[$i]}${suffix}"
         if [[ -n "$item_bindings" ]]; then
             bindings_found[i]=1
-            labels[i]+=" ⌨"
+            display_items+=("${prefix}${all_items[$i]}${suffix} ⌨")
         else
             bindings_found[i]=0
+            display_items+=("${prefix}${all_items[$i]}${suffix}")
         fi
-        descriptions[i]=$(item_description "${item_types[$i]}" "${all_items[$i]}")
-        if [[ -n "${descriptions[i]}" && ${#labels[i]} -gt $label_width ]]; then
-            label_width=${#labels[i]}
-        fi
-    done
-
-    # 33 fits every catalogue label, up to "Google Messages (shortcut only) ⌨";
-    # one longer custom label should not push every description off screen.
-    ((label_width > 33)) && label_width=33
-    local columns
-    columns=$(terminal_columns)
-    for i in "${!all_items[@]}"; do
-        display_items+=("$(described_row "${prefixes[i]}" "${lead_columns[i]}" "${labels[i]}" \
-            "${descriptions[i]}" $((8 + label_width + 2)) "$columns")")
     done
     
     # Check if any items have bindings
@@ -1135,7 +1060,7 @@ enhanced_select_packages() {
         gum style \
             --foreground 51 \
             --italic \
-            "Select items to remove (Tab to select, Enter to confirm)"
+            "Select items to remove (Tab to select, Enter to review descriptions)"
         
         if [[ "$has_bindings" == true ]]; then
             gum style \
@@ -1147,7 +1072,7 @@ enhanced_select_packages() {
         echo ""
         
         if ! selected_items=$(printf '%s\n' "${display_items[@]}" | \
-            gum filter \
+            GUM_FILTER_SELECTED='' gum filter \
                 --limit 0 \
                 --no-limit \
                 --indicator " ▸" \
@@ -1212,18 +1137,46 @@ enhanced_select_packages() {
     return 0
 }
 
+# Query the actual recursive removal set without root. Keep diagnostics for
+# dependency handling, but only package names belong in the displayed plan.
+preview_package_removal() {
+    PACKAGE_PREVIEW=()
+    PACKAGE_PREVIEW_OUTPUT=$(LC_ALL=C pacman -Rs --print --print-format '%n' -- "$@" 2>&1) || return 1
+    local line target found
+    while IFS= read -r line; do
+        [[ "$line" =~ ^[[:alnum:]@_+][[:alnum:]@._+-]*$ ]] && PACKAGE_PREVIEW+=("$line")
+    done <<< "$PACKAGE_PREVIEW_OUTPUT"
+    # A successful but incomplete/unrecognized preview must not authorize a
+    # blind removal. Pacman's print format includes every explicit target.
+    for target in "$@"; do
+        found=false
+        for line in "${PACKAGE_PREVIEW[@]}"; do
+            [[ "$line" == "$target" ]] && found=true && break
+        done
+        [[ "$found" == true ]] || return 1
+    done
+    [[ ${#PACKAGE_PREVIEW[@]} -gt 0 ]]
+}
+
 # pacman refuses the whole transaction if an installed package outside the
 # selection still needs a selected one (ufw-docker needs docker). A dry run,
 # which needs no root, names them: keep those and remove the rest. Repeat,
-# since a kept package can in turn need others in the selection. Any other
-# dry-run failure is left for the real transaction to report.
+# since a kept package can in turn need others in the selection. Abort on an
+# unexplained failure: the user must see a complete plan before confirming.
 find_blocked_packages() {
     REMOVABLE_PACKAGES=("$@")
     KEPT_PACKAGES=()
+    PLANNED_PACKAGES=()
+    PACKAGE_PLAN_READY=false
     declare -gA KEPT_REASONS=()
     local output line package
     while [[ ${#REMOVABLE_PACKAGES[@]} -gt 0 ]]; do
-        output=$(LC_ALL=C pacman -Rs --print -- "${REMOVABLE_PACKAGES[@]}" 2>&1) && return 0
+        if preview_package_removal "${REMOVABLE_PACKAGES[@]}"; then
+            PLANNED_PACKAGES=("${PACKAGE_PREVIEW[@]}")
+            PACKAGE_PLAN_READY=true
+            return 0
+        fi
+        output="$PACKAGE_PREVIEW_OUTPUT"
         local -A blocked=()
         while IFS= read -r line; do
             if [[ "$line" =~ ^::\ removing\ ([^[:space:]]+)\ breaks\ dependency\ .+\ required\ by\ ([^[:space:]]+)$ ]]; then
@@ -1237,7 +1190,7 @@ find_blocked_packages() {
                 fi
             fi
         done <<< "$output"
-        [[ ${#blocked[@]} -gt 0 ]] || return 0
+        [[ ${#blocked[@]} -gt 0 ]] || return 1
         local -a remaining=()
         for package in "${REMOVABLE_PACKAGES[@]}"; do
             if [[ -n "${blocked[$package]:-}" ]]; then
@@ -1248,10 +1201,29 @@ find_blocked_packages() {
         done
         # An unexpected diagnostic may name a package outside our selection.
         # Stop if no selected target was set aside; never repeat the same preview
-        # forever. The real transaction still enforces pacman's dependency checks.
-        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 0
+        # forever or authorize an unreviewed transaction.
+        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 1
         REMOVABLE_PACKAGES=("${remaining[@]}")
     done
+    return 0
+}
+
+# Selected packages are listed in their own confirmation section. Show the
+# rest of pacman's plan explicitly, rather than only a generic dependency warning.
+print_additional_package_removals() {
+    local package selected explicit
+    local additional=()
+    for package in "${PLANNED_PACKAGES[@]}"; do
+        explicit=false
+        for selected in "$@"; do
+            [[ "$package" == "$selected" ]] && explicit=true && break
+        done
+        [[ "$explicit" == false ]] && additional+=("$package")
+    done
+    [[ ${#additional[@]} -gt 0 ]] || return 0
+    gum style --foreground 214 --bold "Additional dependencies to remove (${#additional[@]}):"
+    print_confirmation_items package "${additional[@]}"
+    echo ""
 }
 
 print_kept_packages() {
@@ -1272,28 +1244,21 @@ print_kept_packages() {
     echo ""
 }
 
-# Itemised confirmation rows, with descriptions aligned within each section.
+# Keep complete names and descriptions in the confirmation. gum handles Unicode
+# and word wrapping; descriptions never enter the fuzzy selector's search text.
 print_confirmation_items() {
     local type="$1"
     shift
-    local labels=() descriptions=()
-    local name label width=0 columns i
+    local name label description columns
+    columns=$(terminal_columns)
     for name in "$@"; do
         label="$name"
         if [[ "$type" == webapp ]] && ! is_webapp_installed "$name"; then
             label="$name (shortcut only)"
         fi
-        labels+=("$label")
-        descriptions+=("$(item_description "$type" "$name")")
-        if [[ -n "${descriptions[-1]}" && ${#label} -gt $width ]]; then
-            width=${#label}
-        fi
-    done
-    ((width > 33)) && width=33
-    columns=$(terminal_columns)
-    for i in "${!labels[@]}"; do
-        gum style --foreground 214 \
-            "$(described_row "   • " 5 "${labels[i]}" "${descriptions[i]}" $((5 + width + 2)) "$columns")"
+        description=$(item_description "$type" "$name")
+        [[ -n "$description" ]] && label+=" — $description"
+        gum style --foreground 214 --width "$columns" "   • $label"
     done
 }
 
@@ -1304,6 +1269,16 @@ remove_packages() {
     REMOVED_PACKAGES=()
     [[ ${#packages[@]} -gt 0 ]] || return 0
     gum style --foreground 39 --bold "📦 Removing ${#packages[@]} package(s)..."
+    if ! preview_package_removal "${packages[@]}"; then
+        gum log --level error "Could not verify the package removal plan; packages were kept"
+        return "${#packages[@]}"
+    fi
+    if [[ "$PACKAGE_PLAN_READY" == true &&
+        "$(printf '%s\n' "${PLANNED_PACKAGES[@]}" | sort -u)" != \
+        "$(printf '%s\n' "${PACKAGE_PREVIEW[@]}" | sort -u)" ]]; then
+        gum log --level error "The package removal plan changed; packages were kept. Run Cleaner again to review it."
+        return "${#packages[@]}"
+    fi
     if ! sudo -n true 2>/dev/null; then
         gum style --foreground 214 "🔐 Administrator privileges required for package removal"
         if ! sudo true; then
@@ -1527,8 +1502,14 @@ main() {
     # Before shortcut and removal prompts, set aside packages that installed
     # packages outside the selection still need; pacman would refuse them all.
     KEPT_PACKAGES=()
+    PLANNED_PACKAGES=()
+    PACKAGE_PLAN_READY=false
     if [[ ${#packages_array[@]} -gt 0 ]]; then
-        find_blocked_packages "${packages_array[@]}"
+        if ! find_blocked_packages "${packages_array[@]}"; then
+            gum log --level error "Could not preview package removal; nothing was removed"
+            gum log --level error "$(clean_description "$PACKAGE_PREVIEW_OUTPUT")"
+            return 1
+        fi
         packages_array=("${REMOVABLE_PACKAGES[@]}")
     fi
     
@@ -1661,6 +1642,7 @@ main() {
     fi
 
     # Final confirmation
+    load_package_descriptions "${PLANNED_PACKAGES[@]}"
     clear
 
     # Build confirmation content using separate lines
@@ -1696,6 +1678,7 @@ main() {
         
         print_confirmation_items package "${packages_array[@]}"
         echo ""
+        print_additional_package_removals "${packages_array[@]}"
     fi
     print_kept_packages
     

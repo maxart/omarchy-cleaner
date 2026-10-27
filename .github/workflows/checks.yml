@@ -1,0 +1,34 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check Bash syntax
+        run: bash -n omarchy-cleaner.sh
+      - name: Lint
+        run: shellcheck omarchy-cleaner.sh
+      - name: Prepare gum for real selector checks
+        env:
+          GUM_RELEASE: https://github.com/charmbracelet/gum/releases/download/v2.0.2/gum_2.0.2_Linux_x86_64.tar.gz
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 "$GUM_RELEASE" -o gum.tar.gz
+          echo 'd842e06d93dbed90af48cb8dd10698db6f22e331fc40346bb37bbc753109edc2  gum.tar.gz' | sha256sum --check
+          tar -xzf gum.tar.gz
+          echo "CLEANER_TEST_GUM=$RUNNER_TEMP/gum_2.0.2_Linux_x86_64/gum" >> "$GITHUB_ENV"
+      - name: Run isolated regression tests
+        run: python3 -m unittest discover -s tests -v

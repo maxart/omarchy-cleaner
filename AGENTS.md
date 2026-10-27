@@ -45,6 +45,12 @@ parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
 webapp_domains_for      Maps a webapp name -> URL domain(s) that identify it.
 app_tokens_for          Maps a package -> newline-delimited commands its keybind
                         references, preserving subcommands (docker compose).
+curated_description_for Short functional summary per webapp/TUI/CLI, keyed by category;
+                        sources in docs/item-descriptions.md.
+load_package_descriptions  Packages use pacman's Description instead: one
+                        LC_ALL=C pacman -Qi call; control characters removed.
+print_confirmation_items  Shows complete names and descriptions; gum wraps text
+                        to terminal width. Descriptions stay out of name search.
 find_bindings_in_file   Matches supported single-line Lua/conf bindings; can
                         return line numbers so identical comment text survives.
 find_app_bindings       Matches the user's bindings file.
@@ -56,7 +62,9 @@ cleanup_bindings        Creates a checked, unique backup and atomic replacement;
 
 enhanced_select_packages   The gum fuzzy multi-select. Items arrive in one array
                         split by "--webapps--"/"--npmclis--" sentinels; prefixed
-                        📦/🌐/⬢ and marked ⌨ if they have a keybind. Sets globals
+                        📦/🌐/⬢ and marked ⌨ if they have a keybind.
+                        Selection maps each returned
+                        row back by exact match. Sets globals
                         SELECTED_PACKAGES / SELECTED_WEBAPPS / SELECTED_NPMCLIS
                         (newline-delimited, to survive names with spaces).
 remove_webapps          Removes one selected webapp/TUI launcher with its helper;
@@ -65,7 +73,10 @@ remove_npm_clis         Rechecks ownership and deletes selected stubs (no sudo).
 find_blocked_packages   Rootless `pacman -Rs --print` dry run; sets aside selected
                         packages still required by installed ones outside the
                         selection (ufw-docker -> docker), so the rest can go.
+                        Records the complete recursive removal set for confirmation;
+                        unknown preview failures abort before any mutation.
 remove_packages         Acquires sudo, removes selected packages in one transaction.
+                        Rechecks the confirmed package set first; changes abort.
 remove_items            parse_sections, all three removers, then binding cleanup
                         only for successful removals, followed by the hero box.
 main                    Banner → scan → select → dry run → keybind prompt → confirm
@@ -257,6 +268,9 @@ as blocked; do not claim a VM pass from stubbed tests.
   mapping in `cli_packages_for` and verify the full upstream wrapper template.
   A webapp that's added also needs a `webapp_domains_for` entry for binding cleanup to
   find it.
+- Every webapp, TUI, and CLI entry needs a short functional `curated_description_for`
+  summary with a source in `docs/item-descriptions.md`. Prefer clear paraphrases
+  over marketing copy. Packages use their pacman description.
 
 ## Agent behaviour
 

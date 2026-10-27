@@ -4,7 +4,7 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="3.1"
+VERSION="3.2"
 
 # Configuration
 # Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
@@ -20,6 +20,10 @@ if [[ -f "$HOME/.config/hypr/hyprland.lua" ]]; then
     BINDINGS_FILE="$HOME/.config/hypr/bindings.lua"
 fi
 REMOVE_BINDINGS=false
+# Package name -> pacman description, filled by load_package_descriptions.
+declare -A PACKAGE_DESCRIPTIONS=()
+PLANNED_PACKAGES=()
+PACKAGE_PLAN_READY=false
 
 # App
 # List from: https://github.com/omacom/omarchy/blob/quattro/install/omarchy-base.packages
@@ -559,6 +563,106 @@ app_tokens_for() {
     esac
 }
 
+# Short functional descriptions for items with no local metadata.
+# Packages use their pacman description instead. Sources and editing guidance:
+# docs/item-descriptions.md. The category keeps Grok/grok and HEY/hey apart.
+curated_description_for() {
+    case "$1:$2" in
+        "webapp:HEY")             echo "Email and calendar" ;;
+        "webapp:Basecamp")        echo "Project management and team collaboration" ;;
+        "webapp:WhatsApp")        echo "Messaging and voice/video calls" ;;
+        "webapp:Google Photos")   echo "Photo storage, search and editing" ;;
+        "webapp:Google Contacts") echo "Address book" ;;
+        "webapp:Google Messages") echo "Text messaging" ;;
+        "webapp:Google Maps")     echo "Maps and directions" ;;
+        "webapp:YouTube")         echo "Video sharing and streaming" ;;
+        "webapp:X")               echo "Social network and news" ;;
+        "webapp:Zoom")            echo "Video meetings and team chat" ;;
+        "webapp:Discord")         echo "Community text, voice and video chat" ;;
+        "webapp:Grok")            echo "AI chat assistant" ;;
+        "webapp:ChatGPT")         echo "AI chat assistant" ;;
+        "webapp:GitHub")          echo "Code hosting and collaboration" ;;
+        "webapp:Figma")           echo "Interface design and collaboration" ;;
+        "webapp:Fizzy")           echo "Kanban boards" ;;
+        "webapp:Docker")          echo "Docker container management in a terminal" ;;
+        "webapp:Disk Usage")      echo "Disk usage viewer" ;;
+        "npmcli:codex")           echo "OpenAI coding agent" ;;
+        "npmcli:claude")          echo "Anthropic coding agent" ;;
+        "npmcli:crush")           echo "Terminal coding agent" ;;
+        "npmcli:gemini")          echo "Google coding agent" ;;
+        "npmcli:gh")              echo "GitHub command-line interface" ;;
+        "npmcli:copilot")         echo "GitHub coding agent" ;;
+        "npmcli:opencode")        echo "Open-source coding agent" ;;
+        "npmcli:playwright"|"npmcli:playwright-cli")
+                                  echo "Browser automation" ;;
+        "npmcli:pi")              echo "Terminal coding agent" ;;
+        "npmcli:omp")             echo "Coding agent with IDE tools" ;;
+        "npmcli:grok")            echo "Grok terminal assistant" ;;
+        "npmcli:cursor-agent")    echo "Cursor coding agent" ;;
+        "npmcli:ghui")            echo "GitHub pull requests in a terminal" ;;
+        "npmcli:hunk")            echo "Terminal diff viewer" ;;
+        "npmcli:muse")            echo "Meta coding agent" ;;
+        "npmcli:hermes")          echo "Self-hosted AI agent" ;;
+        "npmcli:agy")             echo "Google Antigravity terminal companion" ;;
+        "npmcli:hey")             echo "HEY command-line interface" ;;
+        "npmcli:basecamp")        echo "Basecamp command-line interface" ;;
+        "npmcli:cf")              echo "Cloudflare API command-line interface" ;;
+        "npmcli:ori")             echo "OpenRouter command-line interface" ;;
+    esac
+}
+
+# Read every offered package's description in one query. LC_ALL=C keeps the
+# field labels English whatever language Omarchy is set to. pacman wraps values
+# to an exported COLUMNS even into a pipe; COLUMNS=0 turns that off, and any
+# indented continuation lines are still joined back on.
+load_package_descriptions() {
+    PACKAGE_DESCRIPTIONS=()
+    [[ $# -gt 0 ]] || return 0
+    local line name="" in_description=false
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^Name[[:space:]]*:[[:space:]](.*)$ ]]; then
+            name="${BASH_REMATCH[1]}"
+            in_description=false
+        elif [[ -n "$name" && "$line" =~ ^Description[[:space:]]*:[[:space:]](.*)$ ]]; then
+            PACKAGE_DESCRIPTIONS["$name"]="${BASH_REMATCH[1]}"
+            in_description=true
+        elif [[ "$in_description" == true && "$line" =~ ^[[:space:]]+([^[:space:]].*)$ ]]; then
+            PACKAGE_DESCRIPTIONS["$name"]+=" ${BASH_REMATCH[1]}"
+        else
+            in_description=false
+        fi
+    done < <(COLUMNS=0 LC_ALL=C pacman -Qi -- "$@" 2>/dev/null)
+}
+
+# Package metadata is shown verbatim: drop control characters (and with them
+# any escape sequences) and collapse whitespace. pacman prints None for empty.
+clean_description() {
+    local -a words
+    read -r -a words <<< "${1//[[:cntrl:]]/ }"
+    [[ "${words[*]}" == None ]] && return 0
+    printf '%s' "${words[*]}"
+}
+
+item_description() {
+    case "$1" in
+        package) clean_description "${PACKAGE_DESCRIPTIONS[$2]:-}" ;;
+        *)       clean_description "$(curated_description_for "$1" "$2")" ;;
+    esac
+}
+
+# An exported COLUMNS wins, so callers and tests can pin the layout width.
+terminal_columns() {
+    local size columns
+    if [[ "${COLUMNS:-}" =~ ^[1-9][0-9]*$ ]]; then
+        columns="$COLUMNS"
+    elif size=$(stty size < /dev/tty 2>/dev/null) && [[ "${size#* }" =~ ^[1-9][0-9]*$ ]]; then
+        columns="${size#* }"
+    elif ! columns=$(tput cols 2>/dev/null) || [[ ! "$columns" =~ ^[1-9][0-9]*$ ]]; then
+        columns=80
+    fi
+    printf '%s\n' "$columns"
+}
+
 # A line-oriented matcher cannot safely interpret mixed Lua string expressions.
 # Decline user-line deletion for ambiguous long-string layouts anywhere in a file.
 # Default unbinds can still be prepended without changing that file's own lines.
@@ -592,8 +696,13 @@ find_bindings_in_file() {
     # Preserve the catalogue's case: Docker is a desktop launcher; docker is
     # the engine package. Removing the launcher must not claim engine commands.
     readarray -t tokens < <(app_tokens_for "$1")
-    local quote="[\"']"
-    local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${quote}[^\"']+${quote}[[:space:]]*,[[:space:]]*(${quote}[^\"']*${quote}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${quote}([^\"']+)${quote}[^{}]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
+    # Accept only literal commands and the optional literal focus field used by
+    # Omarchy. An arbitrary tail can change the command ("obsidian" .. suffix),
+    # override it with a second dispatcher, or evaluate an unrelated function.
+    # Escaped strings and other table fields are left for manual cleanup.
+    local literal="(\"[^\"\\\\]*\"|'[^'\\\\]*')"
+    local focus="(,[[:space:]]*focus[[:space:]]*=[[:space:]]*(${literal}|true|false)[[:space:]]*)?"
+    local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${literal}[[:space:]]*,[[:space:]]*(${literal}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${literal}[[:space:]]*${focus},?[[:space:]]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
     local legacy='^[[:space:]]*bindd[[:space:]]*=.*,[[:space:]]*exec[[:space:]]*,[[:space:]]*(.*)$'
     local line action command token host domain matched_line
     local line_number=0
@@ -613,8 +722,9 @@ find_bindings_in_file() {
         action=""
         command=""
         if [[ "$line" =~ $lua ]]; then
-            action="${BASH_REMATCH[2]}"
-            command="${BASH_REMATCH[3]}"
+            action="${BASH_REMATCH[4]}"
+            command="${BASH_REMATCH[5]}"
+            command="${command:1:${#command}-2}"
         elif [[ "$line" =~ $legacy ]]; then
             command="${BASH_REMATCH[1]}"
             [[ "$command" == omarchy-launch-webapp\ * || "$command" == omarchy-launch-or-focus-webapp\ * ]] && action=webapp
@@ -950,7 +1060,7 @@ enhanced_select_packages() {
         gum style \
             --foreground 51 \
             --italic \
-            "Select items to remove (Tab to select, Enter to confirm)"
+            "Select items to remove (Tab to select, Enter to review descriptions)"
         
         if [[ "$has_bindings" == true ]]; then
             gum style \
@@ -962,7 +1072,7 @@ enhanced_select_packages() {
         echo ""
         
         if ! selected_items=$(printf '%s\n' "${display_items[@]}" | \
-            gum filter \
+            GUM_FILTER_SELECTED='' gum filter \
                 --limit 0 \
                 --no-limit \
                 --indicator " ▸" \
@@ -1027,18 +1137,46 @@ enhanced_select_packages() {
     return 0
 }
 
+# Query the actual recursive removal set without root. Keep diagnostics for
+# dependency handling, but only package names belong in the displayed plan.
+preview_package_removal() {
+    PACKAGE_PREVIEW=()
+    PACKAGE_PREVIEW_OUTPUT=$(LC_ALL=C pacman -Rs --print --print-format '%n' -- "$@" 2>&1) || return 1
+    local line target found
+    while IFS= read -r line; do
+        [[ "$line" =~ ^[[:alnum:]@_+][[:alnum:]@._+-]*$ ]] && PACKAGE_PREVIEW+=("$line")
+    done <<< "$PACKAGE_PREVIEW_OUTPUT"
+    # A successful but incomplete/unrecognized preview must not authorize a
+    # blind removal. Pacman's print format includes every explicit target.
+    for target in "$@"; do
+        found=false
+        for line in "${PACKAGE_PREVIEW[@]}"; do
+            [[ "$line" == "$target" ]] && found=true && break
+        done
+        [[ "$found" == true ]] || return 1
+    done
+    [[ ${#PACKAGE_PREVIEW[@]} -gt 0 ]]
+}
+
 # pacman refuses the whole transaction if an installed package outside the
 # selection still needs a selected one (ufw-docker needs docker). A dry run,
 # which needs no root, names them: keep those and remove the rest. Repeat,
-# since a kept package can in turn need others in the selection. Any other
-# dry-run failure is left for the real transaction to report.
+# since a kept package can in turn need others in the selection. Abort on an
+# unexplained failure: the user must see a complete plan before confirming.
 find_blocked_packages() {
     REMOVABLE_PACKAGES=("$@")
     KEPT_PACKAGES=()
+    PLANNED_PACKAGES=()
+    PACKAGE_PLAN_READY=false
     declare -gA KEPT_REASONS=()
     local output line package
     while [[ ${#REMOVABLE_PACKAGES[@]} -gt 0 ]]; do
-        output=$(LC_ALL=C pacman -Rs --print -- "${REMOVABLE_PACKAGES[@]}" 2>&1) && return 0
+        if preview_package_removal "${REMOVABLE_PACKAGES[@]}"; then
+            PLANNED_PACKAGES=("${PACKAGE_PREVIEW[@]}")
+            PACKAGE_PLAN_READY=true
+            return 0
+        fi
+        output="$PACKAGE_PREVIEW_OUTPUT"
         local -A blocked=()
         while IFS= read -r line; do
             if [[ "$line" =~ ^::\ removing\ ([^[:space:]]+)\ breaks\ dependency\ .+\ required\ by\ ([^[:space:]]+)$ ]]; then
@@ -1052,7 +1190,7 @@ find_blocked_packages() {
                 fi
             fi
         done <<< "$output"
-        [[ ${#blocked[@]} -gt 0 ]] || return 0
+        [[ ${#blocked[@]} -gt 0 ]] || return 1
         local -a remaining=()
         for package in "${REMOVABLE_PACKAGES[@]}"; do
             if [[ -n "${blocked[$package]:-}" ]]; then
@@ -1063,10 +1201,29 @@ find_blocked_packages() {
         done
         # An unexpected diagnostic may name a package outside our selection.
         # Stop if no selected target was set aside; never repeat the same preview
-        # forever. The real transaction still enforces pacman's dependency checks.
-        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 0
+        # forever or authorize an unreviewed transaction.
+        [[ ${#remaining[@]} -lt ${#REMOVABLE_PACKAGES[@]} ]] || return 1
         REMOVABLE_PACKAGES=("${remaining[@]}")
     done
+    return 0
+}
+
+# Selected packages are listed in their own confirmation section. Show the
+# rest of pacman's plan explicitly, rather than only a generic dependency warning.
+print_additional_package_removals() {
+    local package selected explicit
+    local additional=()
+    for package in "${PLANNED_PACKAGES[@]}"; do
+        explicit=false
+        for selected in "$@"; do
+            [[ "$package" == "$selected" ]] && explicit=true && break
+        done
+        [[ "$explicit" == false ]] && additional+=("$package")
+    done
+    [[ ${#additional[@]} -gt 0 ]] || return 0
+    gum style --foreground 214 --bold "Additional dependencies to remove (${#additional[@]}):"
+    print_confirmation_items package "${additional[@]}"
+    echo ""
 }
 
 print_kept_packages() {
@@ -1087,6 +1244,24 @@ print_kept_packages() {
     echo ""
 }
 
+# Keep complete names and descriptions in the confirmation. gum handles Unicode
+# and word wrapping; descriptions never enter the fuzzy selector's search text.
+print_confirmation_items() {
+    local type="$1"
+    shift
+    local name label description columns
+    columns=$(terminal_columns)
+    for name in "$@"; do
+        label="$name"
+        if [[ "$type" == webapp ]] && ! is_webapp_installed "$name"; then
+            label="$name (shortcut only)"
+        fi
+        description=$(item_description "$type" "$name")
+        [[ -n "$description" ]] && label+=" — $description"
+        gum style --foreground 214 --width "$columns" "   • $label"
+    done
+}
+
 # Packages are removed together so selected dependencies (e.g. docker-buildx
 # and docker) do not prevent each other from being removed in the wrong order.
 remove_packages() {
@@ -1094,6 +1269,16 @@ remove_packages() {
     REMOVED_PACKAGES=()
     [[ ${#packages[@]} -gt 0 ]] || return 0
     gum style --foreground 39 --bold "📦 Removing ${#packages[@]} package(s)..."
+    if ! preview_package_removal "${packages[@]}"; then
+        gum log --level error "Could not verify the package removal plan; packages were kept"
+        return "${#packages[@]}"
+    fi
+    if [[ "$PACKAGE_PLAN_READY" == true &&
+        "$(printf '%s\n' "${PLANNED_PACKAGES[@]}" | sort -u)" != \
+        "$(printf '%s\n' "${PACKAGE_PREVIEW[@]}" | sort -u)" ]]; then
+        gum log --level error "The package removal plan changed; packages were kept. Run Cleaner again to review it."
+        return "${#packages[@]}"
+    fi
     if ! sudo -n true 2>/dev/null; then
         gum style --foreground 214 "🔐 Administrator privileges required for package removal"
         if ! sudo true; then
@@ -1317,8 +1502,14 @@ main() {
     # Before shortcut and removal prompts, set aside packages that installed
     # packages outside the selection still need; pacman would refuse them all.
     KEPT_PACKAGES=()
+    PLANNED_PACKAGES=()
+    PACKAGE_PLAN_READY=false
     if [[ ${#packages_array[@]} -gt 0 ]]; then
-        find_blocked_packages "${packages_array[@]}"
+        if ! find_blocked_packages "${packages_array[@]}"; then
+            gum log --level error "Could not preview package removal; nothing was removed"
+            gum log --level error "$(clean_description "$PACKAGE_PREVIEW_OUTPUT")"
+            return 1
+        fi
         packages_array=("${REMOVABLE_PACKAGES[@]}")
     fi
     
@@ -1451,6 +1642,7 @@ main() {
     fi
 
     # Final confirmation
+    load_package_descriptions "${PLANNED_PACKAGES[@]}"
     clear
 
     # Build confirmation content using separate lines
@@ -1484,12 +1676,9 @@ main() {
             --bold \
             "📦 Packages (${#packages_array[@]}):"
         
-        for pkg in "${packages_array[@]}"; do
-            gum style \
-                --foreground 214 \
-                "   • $pkg"
-        done
+        print_confirmation_items package "${packages_array[@]}"
         echo ""
+        print_additional_package_removals "${packages_array[@]}"
     fi
     print_kept_packages
     
@@ -1500,11 +1689,7 @@ main() {
             --bold \
             "🌐 Webapps / TUIs (${#webapps_array[@]}):"
 
-        for webapp in "${webapps_array[@]}"; do
-            local label="$webapp"
-            is_webapp_installed "$webapp" || label="$webapp (shortcut only)"
-            gum style --foreground 214 "   • $label"
-        done
+        print_confirmation_items webapp "${webapps_array[@]}"
         echo ""
     fi
 
@@ -1515,11 +1700,7 @@ main() {
             --bold \
             "⬢ CLI wrappers (${#npmclis_array[@]}):"
 
-        for cli in "${npmclis_array[@]}"; do
-            gum style \
-                --foreground 214 \
-                "   • $cli"
-        done
+        print_confirmation_items npmcli "${npmclis_array[@]}"
         echo ""
     fi
 

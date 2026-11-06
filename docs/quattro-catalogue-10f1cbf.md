@@ -1,35 +1,26 @@
-# Quattro catalogue comparison
+# Historical catalogue: Quattro at 10f1cbf
 
-This refresh compares Cleaner after merged PR #7 with [Omarchy Quattro at `10f1cbf7cfbeb8771697dbd493d2f2562db99d7b`](https://github.com/omacom/omarchy/tree/10f1cbf7cfbeb8771697dbd493d2f2562db99d7b). It is a pinned development-branch snapshot, not a claim that every change belongs to release 4.0.4.
+This records the comparison after PR #7 with [Quattro commit `10f1cbf7cfbeb8771697dbd493d2f2562db99d7b`](https://github.com/omacom/omarchy/tree/10f1cbf7cfbeb8771697dbd493d2f2562db99d7b). It describes a development snapshot. For current release support, see the [4.5.0 compatibility report](v4.5.0-compatibility.md).
 
 ## Catalogue changes
 
-| Source | Finding | Cleaner behavior |
-| --- | --- | --- |
-| `install/user/mise.sh` | Adds `github:basecamp/basecamp-cli` as `basecamp`, and `npm:cf` as `cf`. | Offer their complete recognized mise wrappers. Basecamp's CLI and webapp remain separate selections. |
-| `install/user/mise.sh` | Grok now uses package `grok` instead of `npm:@xai-official/grok`. | Recognize both package identifiers; preserve customized wrappers. |
-| `bin/omarchy-remove-preinstalls` | Adds `hype` and `monologue` to its package drop list. | Add both as active packages, gated by `pacman -Qi`. |
-| `install/omarchy-base.packages` | Adds 18 other names missing from the commented catalogue. | Add them commented out: `base-devel`, `disktree-bin`, `fcitx5-chewing`, `fcitx5-chinese-addons`, `fcitx5-hangul`, `fcitx5-mozc`, `ffmpeg`, `gliff`, `omasnap`, `owe`, `owe-lockfeed`, `qt6-base`, `qt6-declarative`, `qt6-multimedia`, `qt6-svg`, `qt6-wayland`, `superwhisper-bin`, `usbguard`. |
-| `applications/*.desktop` | Docker and Disk Usage launchers are absent; Foot, imv, and mpv native overrides are present. | Retain historical TUI detection. Native overrides are not treated as removable webapps. The 11 current webapps are already covered and their contents match the 4.0.4 snapshot. |
+| Source | Change and cleaner behavior |
+| --- | --- |
+| `install/user/mise.sh` | Add `basecamp` and `cf` wrappers; retain both `grok` and `npm:@xai-official/grok` package mappings. Basecamp CLI and webapp selections remain separate. |
+| `bin/omarchy-remove-preinstalls` | Add `hype` and `monologue` to active packages. |
+| `install/omarchy-base.packages` | Add 18 missing names to the commented catalogue. The pinned list is in `catalogues.json`. |
+| `applications/*.desktop` | Keep historical Docker/Disk Usage detection despite their removal upstream. Reject native Foot, imv, and mpv overrides. The 11 webapps match 4.0.4. |
 
-Previous packages and wrappers remain in the catalogue for older or optionally configured installations. In particular, removing packages from upstream's current base/drop list does not cause Cleaner to discard their detection. No changes to package-removal commands, privileges, confirmation, or wrapper ownership rules are needed for this refresh.
+Older package and wrapper entries were retained. The mise installer was byte-identical to the 4.0.4 fixture, so complete-template ownership checks remained sufficient. Account shims were not treated as owned wrappers.
 
-## Ownership and binding compatibility
+## Bindings and Hermes
 
-The current `bin/omarchy-mise-install` is byte-identical to the pinned 4.0.4 fixture, so the existing full-template comparison handles the new CLI tuples. The existing tests still exercise older Grok wrappers. Unknown formats, symlinks, altered package/bin values, and appended commands remain unrecognized.
+The snapshot retained default/preinstall binding switches, the removal marker, and personal overrides after packaged defaults. Omawrite and the changed Google Messages formatting matched existing cleanup rules. No speculative aliases were added for Hype or Monologue.
 
-Current `bin/omarchy-install-hermes-cli` installs Hermes Desktop and accepts `--check`, `--now`, and `--retire-mise`; it no longer provides `--owns`. Inspection confirms an unsupported mode exits before installation or retirement. Cleaner continues to request only `--owns` and leaves Hermes untouched when that query fails. Older installations whose helper still provides the ownership contract remain supported. Cleaner does not invoke `--now` or `--retire-mise`, duplicate ownership markers as an alternative contract, or delete Hermes runtimes.
+Its Hermes installer no longer supported `--owns`; unsupported modes exited before installation or retirement. Cleaner therefore preserved Hermes. It never invoked `--now` or `--retire-mise`, or removed Hermes runtimes.
 
-Provisioning now also calls `mise reshim` for account dispatchers. This does not authorize removing arbitrary mise shims or account configuration; CLI ownership remains limited to known wrappers under `~/.local/bin`.
+## Validation at the time
 
-Inspected `default/hypr/bindings/applications.lua`, `default/hypr/helpers.lua`, `default/hypr/omarchy.lua`, and `config/hypr/hyprland.lua`. The default-binding switch, preinstall-binding switch, and removal marker are still supported. Personal bindings load after packaged defaults. Current application bindings include Omawrite and slightly different formatting for Google Messages, both recognized by the existing matcher. No packaged application bindings for `hype` or `monologue` were found; no speculative token aliases or new unbind behavior were added.
+Syntax, ShellCheck 0.11.0, whitespace checks, and 43 isolated tests passed. The five new tests covered CLI discovery, category independence, native desktops, binding override order, and a Hermes helper without `--owns`. Catalogue tests failed before the missing entries were added.
 
-## Validation
-
-- Syntax check, ShellCheck 0.11.0, and whitespace checks pass.
-- All 43 regression tests on this standalone patch pass, including five new tests covering current CLI discovery/preservation, Basecamp category independence, native desktop preservation, current binding cleanup/override ordering, and a Hermes helper without an ownership contract.
-- Before the runtime catalogue changes, the new snapshot failed catalogue coverage for the 20 missing base-package names, and current CLI discovery failed.
-- Snapshot data was extracted from the local pinned upstream checkout without executing provisioning or removal scripts. Current desktop and binding fixtures are copied verbatim; the generator's byte identity was checked separately.
-- Tests use disposable homes and stubbed system commands. No live Omarchy VM/TUI smoke test has been performed.
-
-PR #8 adds a separate set of five 4.0.4 regression tests. The count above describes this patch independently, without assuming that PR is merged.
+Fixtures came from the pinned checkout without executing provisioning or removal scripts. This standalone patch did not include PR #8's additional tests or a live VM smoke test. See [fixture provenance](../tests/fixtures/README.md).

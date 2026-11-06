@@ -20,8 +20,7 @@ checkout's local configuration without adding it to the candidate archive.
   SSH connection or desktop. A container hosting the hypervisor may still access
   host files; do not run removals there or in the host shell.
 - Verify the guest's current version and identity against local configuration;
-  do not assume it
-  matches current upstream or silently upgrade it to make a test pass.
+  do not assume it matches current upstream or silently upgrade it to make a test pass.
 - Use the locally configured VM and helpers. If configuration or access is
   unavailable, diagnose and report what is blocked; do not install another
   environment or bypass sandbox policy.
@@ -64,6 +63,7 @@ Choose live cases according to the diff, using actual installed defaults:
 | Selection or confirmation | Names with spaces and category boundaries survive; final confirmation lists exactly the selection; cancellation causes no removals or binding edits. |
 | Package removal or sudo | One selected disposable package is removed through the expected transaction; unselected apps remain; refusal/failure is reported and retains shortcuts. Only the package transaction uses sudo. |
 | Webapp/TUI or CLI removal | Selected owned launcher/wrapper disappears; unselected and customized files remain. Same-name native desktops and symlinks remain protected. |
+| CLI default-group opt-out | Confirmation includes every default and runtime; only explicit group consent disables the set. Verify settings backups, recovery, and preservation of personal/project declarations and installed data. |
 | Binding cleanup | Consent is respected; backup is exact; only successful removals affect matching shortcuts; personal overrides still work; packaged config and the global removal marker remain unchanged. |
 | TUI or summaries | Real display renders and accepts input; success, cancellation, and partial/failure output agree with actual results. |
 

@@ -28,7 +28,7 @@ DEFAULT_APPS[]          pacman packages offered for removal (active + a large
                         commented catalogue of every other Omarchy default).
 DEFAULT_WEBAPPS[]       Omarchy webapps offered for removal (by display name).
 DEFAULT_TUIS[]          Known TUI desktop launchers (Docker and Disk Usage).
-DEFAULT_NPM_CLIS[]      Omarchy npm CLI tools (codex, gemini, opencode, ...),
+DEFAULT_NPM_CLIS[]      Legacy Omarchy CLI wrappers (codex, gemini, opencode, ...),
                         installed as mise/npx/pnpm wrappers in ~/.local/bin.
                         Complete known templates are checked, or Hermes' upstream
                         read-only --owns contract. Customized files/links stay.
@@ -38,6 +38,10 @@ is_webapp_installed     Checks a regular desktop file and its launcher command.
 is_npm_cli_installed    Checks a regular non-symlink wrapper against complete
                         known templates and command/package mappings.
 get_installed_*         Filter each DEFAULT_* list down to what's installed.
+                        CLI scan also offers the explicit 4.5 default-tools group.
+plan_mise_defaults      Snapshot the whole group and its configuration for consent.
+remove_mise_defaults    Recheck, back up, invoke the upstream whole-file opt-out;
+                        recover settings after a failed shim refresh.
 parse_sections          Splits a combined "items + --webapps-- + --npmclis--"
                         array into PARSED_PACKAGES/WEBAPPS/NPMCLIS globals. Used
                         by both the selector and the remover.
@@ -95,7 +99,9 @@ sources of truth, in an available clone of the upstream Omarchy repo:
 
 - **`install/omarchy-base.packages`** — the canonical default package list.
 - **`applications/*.desktop`** — current webapp and TUI launchers.
-- **`install/user/mise.sh`** and **`bin/omarchy-mise-install`** — current CLI
+- **`etc/mise/conf.d/omarchy-tools.toml`** and
+  **`bin/omarchy-mise-default-tools`** — 4.5 lazy declarations and whole-set opt-out.
+  **`install/user/mise.sh`** and **`bin/omarchy-mise-install`** supply legacy CLI
   names and wrapper contents. Also check `bin/omarchy-install-hermes-cli`.
 - **`default/hypr/bindings/applications.lua`** — packaged application bindings.
 - Legacy sources include `install/packaging/webapps.sh`,
@@ -167,6 +173,18 @@ webapp names with spaces ("Google Photos") survive. Preserve that when touching
 the select/parse code, and keep quoting names everywhere they're passed to a
 command.
 
+### Omarchy 4.5 lazy CLI defaults
+
+Offer `Omarchy default CLI tools (all)` as an explicit, unselected group. Its
+confirmation must list the complete declarations, including node/uv and unknown
+future keys. Individual entries remain selective legacy-wrapper removals and
+must never call the whole-set opt-out. Do not infer ownership from arbitrary
+shim files or use `disable_tools`, which also blocks personal/project tools.
+Recheck the confirmed group and configuration before mutation; back up existing
+miserc settings and recover after an expected helper edit fails. Preserve
+customized launchers, runtime data, and personal/project declarations. Refuse
+symlinked/hardlinked settings and conflicting personal ignore lists.
+
 ### Keyboard-binding cleanup (dual-format)
 
 If selected apps have Hyprland keybinds, the script offers to strip them from the
@@ -182,7 +200,8 @@ shortcuts. Never edit packaged config or disable every preinstall binding.
 
 `find_app_bindings` matches both formats:
 
-- **Lua**: `o.bind("KEY", "Label", { launch/tui/omarchy = "app", ... })` and
+- **Lua**: literal `o.bind("KEY", "Label", "command")`,
+  `o.bind("KEY", "Label", { launch/tui/omarchy = "app", ... })` and
   `{ webapp = "https://..." }`.
 - **.conf**: `bindd = ..., exec, <launcher> ...` (`uwsm-app --`,
   `omarchy-launch-or-focus`, `omarchy-launch-tui`, `omarchy-launch-webapp`, etc.).

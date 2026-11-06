@@ -4,7 +4,7 @@
 # Enhanced with gum for a better TUI experience
 
 # Version
-VERSION="3.2"
+VERSION="3.3"
 
 # Configuration
 # Omarchy migrated Hyprland config from *.conf to *.lua; support whichever the
@@ -24,6 +24,9 @@ REMOVE_BINDINGS=false
 declare -A PACKAGE_DESCRIPTIONS=()
 PLANNED_PACKAGES=()
 PACKAGE_PLAN_READY=false
+MISE_DEFAULTS_ITEM="Omarchy default CLI tools (all)"
+PLANNED_MISE_TOOLS=()
+MISE_PLAN_READY=false
 
 # App
 # List from: https://github.com/omacom/omarchy/blob/quattro/install/omarchy-base.packages
@@ -38,6 +41,7 @@ DEFAULT_APPS=(
     "libreoffice-fresh"
     "xournalpp"
     "pinta"
+    "signed"
     "obsidian"
     "obs-studio"
     "monologue"
@@ -113,6 +117,7 @@ DEFAULT_APPS=(
     # "fcitx5-hangul"
     # "fcitx5-mozc"
     # "fcitx5-qt"
+    # "fcitx5-table-extra"
     # "fd"
     # "ffmpeg"
     # "ffmpegthumbnailer"
@@ -176,6 +181,8 @@ DEFAULT_APPS=(
     # "neovim"
     # "nvim"
     # "omarchy-nvim"
+    # "omarchy-hyprland-titlebars"
+    # "omarchy-power-profiles-daemon"
     # "omarchy-walker"
     # "omasnap"
     # "owe"
@@ -248,6 +255,7 @@ DEFAULT_APPS=(
     # "xdg-desktop-portal-hyprland"
     # "xdg-terminal-exec"
     # "xmlstarlet"
+    # "xorg-xsetroot"
     # "yaru-icon-theme"
     # "yay"
     # "yt-dlp"
@@ -282,9 +290,9 @@ DEFAULT_WEBAPPS=(
 DEFAULT_TUIS=("Docker" "Disk Usage")
 
 # CLI tools
-# List from: https://github.com/omacom/omarchy/blob/quattro/install/user/mise.sh
-# These are installed as mise (Omarchy 4) or pnpm-dlx (Omarchy 3) wrapper stubs
-# in ~/.local/bin (not pacman), so they are removed by deleting the stub.
+# Sources: v4.5.0 etc/mise/conf.d/omarchy-tools.toml and older install/user/mise.sh.
+# Legacy wrappers remain individually removable. 4.5 lazy declarations are a
+# separate whole-set opt-out: upstream has no per-default removal API.
 DEFAULT_NPM_CLIS=(
     "codex"
     "claude"
@@ -311,6 +319,16 @@ DEFAULT_NPM_CLIS=(
     "basecamp"
     "cf"
     "ori"
+    "kimi"
+    "amp"
+    "devin"
+    "kiro-cli"
+    "dsh"
+    "kilo"
+    "mcode"
+    "commandcode"
+    "freebuff"
+    "qwen"
 )
 
 # Function to check if package is installed
@@ -358,17 +376,27 @@ cli_packages_for() {
         opencode)       printf '%s\n' opencode opencode-ai ;;
         playwright|playwright-cli) printf '%s\n' npm:playwright playwright ;;
         pi)             printf '%s\n' pi @earendil-works/pi-coding-agent @mariozechner/pi-coding-agent ;;
-        omp)            printf '%s\n' github:can1357/oh-my-pi ;;
+        omp)            printf '%s\n' oh-my-pi github:can1357/oh-my-pi ;;
         grok)           printf '%s\n' grok npm:@xai-official/grok ;;
         cursor-agent)   printf '%s\n' cursor-agent ;;
-        ghui)           printf '%s\n' npm:@kitlangton/ghui @kitlangton/ghui ;;
-        hunk)           printf '%s\n' aqua:modem-dev/hunk ;;
+        ghui)           printf '%s\n' ghui npm:@kitlangton/ghui @kitlangton/ghui ;;
+        hunk)           printf '%s\n' hunk aqua:modem-dev/hunk ;;
         agy)            printf '%s\n' antigravity-cli ;;
-        hey)            printf '%s\n' github:basecamp/hey-cli ;;
-        basecamp)       printf '%s\n' github:basecamp/basecamp-cli ;;
+        hey)            printf '%s\n' hey-cli github:basecamp/hey-cli ;;
+        basecamp)       printf '%s\n' basecamp github:basecamp/basecamp-cli ;;
         cf)             printf '%s\n' npm:cf ;;
-        ori)            printf '%s\n' github:OpenRouterLabs/ori-releases ;;
-        muse)           printf '%s\n' 'http:muse[url=https://api.meta.ai/muse-launcher.sh,bin=muse,version_list_url=https://api.meta.ai/muse-code/channels/muse-stable,version_json_path=.version]' ;;
+        ori)            printf '%s\n' ori github:OpenRouterLabs/ori-releases ;;
+        muse)           printf '%s\n' muse 'http:muse[url=https://api.meta.ai/muse-launcher.sh,bin=muse,version_list_url=https://api.meta.ai/muse-code/channels/muse-stable,version_json_path=.version]' ;;
+        kimi)           printf '%s\n' npm:@moonshot-ai/kimi-code ;;
+        amp)            printf '%s\n' amp ;;
+        devin)          printf '%s\n' http:devin ;;
+        kiro-cli)       printf '%s\n' http:kiro-cli ;;
+        dsh)            printf '%s\n' npm:@deepseek-ai/dsh ;;
+        kilo)           printf '%s\n' npm:@kilocode/cli ;;
+        mcode)          printf '%s\n' npm:@minimax-ai/code ;;
+        commandcode)    printf '%s\n' npm:command-code ;;
+        freebuff)       printf '%s\n' npm:freebuff ;;
+        qwen)           printf '%s\n' qwen ;;
     esac
 }
 
@@ -465,6 +493,122 @@ is_npm_cli_installed() {
     return 1
 }
 
+# Read the upstream declaration contract, never infer ownership from shim paths.
+# Keep the complete set (including runtimes and future tools) visible for consent.
+get_mise_default_tools() {
+    command -v omarchy-mise-default-tools >/dev/null 2>&1 || return 1
+    local tools tool
+    tools=$(omarchy-mise-default-tools list 2>/dev/null) || return 1
+    [[ -n "$tools" ]] || return 1
+    while IFS= read -r tool; do
+        [[ "$tool" =~ ^[a-zA-Z0-9@][a-zA-Z0-9@:/._+-]*$ ]] || return 1
+        omarchy-mise-default-tools declares "$tool" >/dev/null 2>&1 || return 1
+    done <<< "$tools"
+    printf '%s\n' "$tools"
+}
+
+# Only a regular personal miserc may be changed. Refuse redirected parent
+# directories too: the upstream helper appends in place and follows symlinks.
+mise_defaults_state() {
+    local config="${OMARCHY_MISE_CONFIG_PATH:-/etc/mise/conf.d/omarchy-tools.toml}"
+    local miserc="$HOME/.config/mise/miserc.toml" resolved user_root
+    [[ "$config" == /* && "$config" != *[\"\\$'\n'$'\r']* && -f "$config" ]] || return 1
+    [[ ! -L "$miserc" && ( ! -e "$miserc" || ( -f "$miserc" && -r "$miserc" ) ) ]] || return 1
+    [[ ! -e "$miserc" || "$(stat -c %h -- "$miserc")" == 1 ]] || return 1
+    resolved=$(readlink -m -- "$miserc") || return 1
+    user_root=$(readlink -f -- "$HOME") || return 1
+    [[ "$resolved" == "$user_root/.config/mise/miserc.toml" ]] || return 1
+    printf '%s\n' "$config"
+    sha256sum < "$config" || return 1
+    if [[ -e "$miserc" ]]; then
+        sha256sum < "$miserc" || return 1
+    else
+        printf 'absent\n'
+    fi
+}
+
+plan_mise_defaults() {
+    MISE_PLAN_READY=false
+    PLANNED_MISE_TOOLS=()
+    local item tools
+    for item in "$@"; do
+        [[ "$item" == "$MISE_DEFAULTS_ITEM" ]] || continue
+        PLANNED_MISE_STATE=$(mise_defaults_state) || return 1
+        tools=$(get_mise_default_tools) || return 1
+        readarray -t PLANNED_MISE_TOOLS <<< "$tools"
+        MISE_PLAN_READY=true
+    done
+}
+
+# The supported opt-out ignores only Omarchy's file. It does not block tools in
+# personal/project configs, uninstall runtimes, or delete arbitrary shims.
+remove_mise_defaults() {
+    local state tools
+    state=$(mise_defaults_state) || return 1
+    tools=$(get_mise_default_tools) || return 1
+    if [[ "$MISE_PLAN_READY" != true || "$state" != "$PLANNED_MISE_STATE" ||
+        "$tools" != "$(printf '%s\n' "${PLANNED_MISE_TOOLS[@]}")" ]]; then
+        gum log --level error "Default CLI tools or configuration changed; review the selection again"
+        return 1
+    fi
+    local config="${OMARCHY_MISE_CONFIG_PATH:-/etc/mise/conf.d/omarchy-tools.toml}"
+    local miserc="$HOME/.config/mise/miserc.toml" backup="" expected
+    # Do not merge or overwrite a personal ignore list. This is the upstream
+    # helper's own boundary, checked before creating any backup or invoking it.
+    if [[ -f "$miserc" ]] && grep -q '^[[:space:]]*ignored_config_paths[[:space:]]*=' "$miserc"; then
+        gum log --level error "Kept default CLI tools: mise already has a personal ignored_config_paths list"
+        return 1
+    fi
+    mkdir -p -- "$(dirname -- "$miserc")" || return 1
+    expected=$(mktemp "$miserc.tmp.XXXXXXXX") || return 1
+    if [[ -e "$miserc" ]]; then
+        backup=$(mktemp "$miserc.backup.$(date +%Y%m%d_%H%M%S).XXXXXXXX")
+        if [[ -z "$backup" ]] || ! cp --preserve=mode -- "$miserc" "$backup" ||
+            ! cmp -s -- "$miserc" "$backup"; then
+            rm -f -- "$expected"
+            return 1
+        fi
+        gum log --level info "Created backup: $backup"
+    fi
+    if ! (
+        if [[ -n "$backup" ]]; then
+            cat -- "$backup" || exit 1
+            if [[ -s "$backup" && -n "$(tail -c1 -- "$backup")" ]]; then
+                printf '\n' || exit 1
+            fi
+        fi
+        printf 'ignored_config_paths = ["%s"]\n' "$config"
+    ) > "$expected" || [[ "$(mise_defaults_state)" != "$state" ]]; then
+        rm -f -- "$expected"
+        return 1
+    fi
+    if gum spin --spinner dot --show-error --title "Disabling all Omarchy default CLI tools..." -- \
+        env MISE_OFFLINE=1 omarchy-mise-default-tools disable && cmp -s -- "$miserc" "$expected"; then
+        rm -f -- "$expected"
+        gum log --level info "✓ Disabled Omarchy's default tool declarations; personal/project tools and installed data are kept"
+        return 0
+    fi
+    # Restore only a file with exactly the helper's expected edit. Never clobber
+    # an unrelated concurrent edit, even when recovering from reshim failure.
+    if [[ ! -L "$miserc" ]] && cmp -s -- "$miserc" "$expected"; then
+        if [[ -n "$backup" ]]; then
+            if ! cp --preserve=mode -- "$backup" "$expected" || ! mv -f -- "$expected" "$miserc"; then
+                gum log --level error "Could not restore mise configuration; restore the backup: $backup"
+                rm -f -- "$expected"
+                return 1
+            fi
+        else
+            rm -f -- "$miserc" || return 1
+        fi
+        MISE_OFFLINE=1 mise reshim >/dev/null 2>&1 ||
+            gum log --level error "Configuration restored; run mise reshim to repair the tool launchers"
+    elif [[ "$(mise_defaults_state)" != "$state" ]]; then
+        gum log --level error "Mise configuration changed unexpectedly; review $miserc and backup $backup"
+    fi
+    rm -f -- "$expected"
+    return 1
+}
+
 # Function to get list of installed packages from our removal list
 get_installed_packages() {
     for app in "${DEFAULT_APPS[@]}"; do
@@ -496,6 +640,9 @@ get_installed_npm_clis() {
             echo "$cli"
         fi
     done
+    if get_mise_default_tools >/dev/null; then
+        printf '%s\n' "$MISE_DEFAULTS_ITEM"
+    fi
 }
 
 # Splits a combined "items + sentinel sections" array into globals.
@@ -608,6 +755,19 @@ curated_description_for() {
         "npmcli:basecamp")        echo "Basecamp command-line interface" ;;
         "npmcli:cf")              echo "Cloudflare API command-line interface" ;;
         "npmcli:ori")             echo "OpenRouter command-line interface" ;;
+        "npmcli:kimi")            echo "Kimi coding agent" ;;
+        "npmcli:amp")             echo "Terminal coding agent" ;;
+        "npmcli:devin")           echo "Devin coding agent" ;;
+        "npmcli:kiro-cli")        echo "Kiro terminal coding agent" ;;
+        "npmcli:dsh")             echo "DeepSeek agent profiles and plugins" ;;
+        "npmcli:kilo")            echo "Terminal coding agent" ;;
+        "npmcli:mcode")           echo "MiniMax coding agent" ;;
+        "npmcli:commandcode")     echo "Terminal coding agent" ;;
+        "npmcli:freebuff")        echo "Terminal coding agent" ;;
+        "npmcli:qwen")            echo "Qwen coding agent" ;;
+        "npmcli:node")            echo "JavaScript runtime" ;;
+        "npmcli:uv")              echo "Python package and project manager" ;;
+        "npmcli:$MISE_DEFAULTS_ITEM") echo "Opt out of all default mise tools, including Node.js and uv" ;;
     esac
 }
 
@@ -703,6 +863,7 @@ find_bindings_in_file() {
     local literal="(\"[^\"\\\\]*\"|'[^'\\\\]*')"
     local focus="(,[[:space:]]*focus[[:space:]]*=[[:space:]]*(${literal}|true|false)[[:space:]]*)?"
     local lua="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${literal}[[:space:]]*,[[:space:]]*(${literal}|nil)[[:space:]]*,[[:space:]]*\{[[:space:]]*(launch|tui|omarchy|webapp)[[:space:]]*=[[:space:]]*${literal}[[:space:]]*${focus},?[[:space:]]*\}[[:space:]]*\)[[:space:]]*(--.*)?$"
+    local lua_command="^[[:space:]]*o[.]bind[[:space:]]*\([[:space:]]*${literal}[[:space:]]*,[[:space:]]*(${literal}|nil)[[:space:]]*,[[:space:]]*${literal}[[:space:]]*\)[[:space:]]*(--.*)?$"
     local legacy='^[[:space:]]*bindd[[:space:]]*=.*,[[:space:]]*exec[[:space:]]*,[[:space:]]*(.*)$'
     local line action command token host domain matched_line
     local line_number=0
@@ -724,6 +885,10 @@ find_bindings_in_file() {
         if [[ "$line" =~ $lua ]]; then
             action="${BASH_REMATCH[4]}"
             command="${BASH_REMATCH[5]}"
+            command="${command:1:${#command}-2}"
+        elif [[ "$line" =~ $lua_command ]]; then
+            action=launch
+            command="${BASH_REMATCH[4]}"
             command="${command:1:${#command}-2}"
         elif [[ "$line" =~ $legacy ]]; then
             command="${BASH_REMATCH[1]}"
@@ -1262,6 +1427,21 @@ print_confirmation_items() {
     done
 }
 
+# Map declaration keys back to familiar command names for the group preview.
+# Unknown future defaults retain their exact key instead of disappearing.
+print_mise_default_tools() {
+    local cli package tool
+    local -A commands=()
+    for cli in "${DEFAULT_NPM_CLIS[@]}"; do
+        while IFS= read -r package; do
+            [[ -n "$package" && -z "${commands[$package]:-}" ]] && commands["$package"]="$cli"
+        done < <(cli_packages_for "$cli")
+    done
+    for tool in "${PLANNED_MISE_TOOLS[@]}"; do
+        print_confirmation_items npmcli "${commands[$tool]:-$tool}"
+    done
+}
+
 # Packages are removed together so selected dependencies (e.g. docker-buildx
 # and docker) do not prevent each other from being removed in the wrong order.
 remove_packages() {
@@ -1332,6 +1512,15 @@ remove_npm_clis() {
     local failed=0 current=0 cli
     for cli in "$@"; do
         ((current++))
+        if [[ "$cli" == "$MISE_DEFAULTS_ITEM" ]]; then
+            if remove_mise_defaults; then
+                REMOVED_NPMCLIS+=("$cli")
+            else
+                gum log --level error "✗ Could not disable the Omarchy default CLI tools"
+                ((failed++))
+            fi
+            continue
+        fi
         gum style --foreground 51 "[$current/$#] Processing CLI wrapper: $cli"
         if is_npm_cli_installed "$cli" &&
             gum spin --spinner dot --show-error --title "Removing $cli wrapper..." -- \
@@ -1497,6 +1686,11 @@ main() {
 
     if [[ -n "$selected_npmcli_lines" ]]; then
         readarray -t npmclis_array <<< "$selected_npmcli_lines"
+    fi
+
+    if ! plan_mise_defaults "${npmclis_array[@]}"; then
+        gum log --level error "Could not preview default CLI opt-out; nothing was removed"
+        return 1
     fi
 
     # Before shortcut and removal prompts, set aside packages that installed
@@ -1698,9 +1892,15 @@ main() {
         gum style \
             --foreground 39 \
             --bold \
-            "⬢ CLI wrappers (${#npmclis_array[@]}):"
+            "⬢ CLI tools (${#npmclis_array[@]}):"
 
         print_confirmation_items npmcli "${npmclis_array[@]}"
+        if [[ "$MISE_PLAN_READY" == true ]]; then
+            gum style --foreground 214 --bold "Opt out of ALL these Omarchy defaults (including runtimes):"
+            print_mise_default_tools
+            gum style --foreground 214 "Individual lazy defaults cannot be removed separately."
+            gum style --foreground 240 "Personal/project declarations, installed tools and caches are kept."
+        fi
         echo ""
     fi
 
@@ -1708,7 +1908,7 @@ main() {
         gum style --foreground 240 --italic "Pacman also removes unused dependencies and package backup configs."
     fi
     if [[ ${#npmclis_array[@]} -gt 0 ]]; then
-        gum style --foreground 240 --italic "CLI removal deletes launcher wrappers; installed runtimes and caches are kept."
+        gum style --foreground 240 --italic "Individual CLI entries delete legacy wrappers only; lazy defaults stay unless the whole group is selected."
     fi
 
     # Show keyboard shortcuts info if applicable

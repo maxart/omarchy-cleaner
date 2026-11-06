@@ -56,3 +56,25 @@ The original PR recorded the references below on 2026-10-20. The displayed text 
 | ⬢ basecamp | Basecamp command-line interface | [basecamp/basecamp-cli](https://github.com/basecamp/basecamp-cli) README |
 | ⬢ cf | Cloudflare API command-line interface | [cloudflare/cf](https://github.com/cloudflare/cf) About |
 | ⬢ ori | OpenRouter command-line interface | [OpenRouterLabs/ori-releases](https://github.com/OpenRouterLabs/ori-releases) README |
+
+### Omarchy 4.5 additions
+
+Verified against the publishers' metadata and the pinned mise v2026.11.1
+registry. The group confirmation uses the same descriptions; Node.js and uv
+appear only inside the explicitly selected whole-set opt-out.
+
+| Item | Description | Source |
+| --- | --- | --- |
+| ⬢ kimi | Kimi coding agent | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) (`@moonshot-ai/kimi-code` package metadata) |
+| ⬢ amp | Terminal coding agent | [mise amp registry](https://github.com/jdx/mise/blob/v2026.11.1/registry/amp.toml) |
+| ⬢ devin | Devin coding agent | [Devin CLI](https://devin.ai/cli) |
+| ⬢ kiro-cli | Kiro terminal coding agent | [Kiro CLI](https://kiro.dev/docs/cli/) |
+| ⬢ dsh | DeepSeek agent profiles and plugins | [npm metadata](https://registry.npmjs.org/@deepseek-ai/dsh/latest) |
+| ⬢ kilo | Terminal coding agent | [npm metadata](https://registry.npmjs.org/@kilocode/cli/latest) |
+| ⬢ mcode | MiniMax coding agent | [npm metadata](https://registry.npmjs.org/@minimax-ai/code/latest) |
+| ⬢ commandcode | Terminal coding agent | [npm metadata](https://registry.npmjs.org/command-code/latest) |
+| ⬢ freebuff | Terminal coding agent | [npm metadata](https://registry.npmjs.org/freebuff/latest) |
+| ⬢ qwen | Qwen coding agent | [mise qwen registry](https://github.com/jdx/mise/blob/v2026.11.1/registry/qwen.toml) |
+| node (group only) | JavaScript runtime | [Node.js](https://nodejs.org/) |
+| uv (group only) | Python package and project manager | [astral-sh/uv](https://github.com/astral-sh/uv) |
+| ⬢ Omarchy default CLI tools (all) | Opt out of all default mise tools, including Node.js and uv | [Omarchy opt-out contract](https://github.com/omacom/omarchy/blob/v4.5.0/bin/omarchy-mise-default-tools) |

@@ -123,6 +123,7 @@ class CleanerTests(unittest.TestCase):
             path.write_text('#!' + sys.executable + '\n' + STUB)
             path.chmod(0o755)
         self.env = {**os.environ, 'HOME': str(self.home), 'OMARCHY_PATH': str(self.upstream),
+                    'OMARCHY_MISE_CONFIG_PATH': str(self.root / 'omarchy-tools.toml'),
                     'PATH': str(self.bin) + ':/usr/bin:/bin', 'CALL_LOG': str(self.log),
                     'LC_ALL': 'C.UTF-8', 'COLUMNS': '100'}
 

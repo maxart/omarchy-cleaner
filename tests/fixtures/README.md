@@ -1,4 +1,4 @@
-These fixtures are copied from [omacom/omarchy](https://github.com/omacom/omarchy) for offline regression checks. They are data; the only executable fixtures are the reviewed wrapper generators, which write into a temporary test home without running the wrappers.
+These fixtures are copied from [omacom/omarchy](https://github.com/omacom/omarchy) for offline regression checks. They are data; executable fixtures are reviewed wrapper generators and the default-tools helper. Tests run them in a temporary home, never execute generated wrappers, and stub the helper’s shim refresh.
 
 - `applications-4.0.0.lua` and `mise-install-4.0.0.sh`: v4.0.0, commit `f0020448ca87329199de7cb12f2015ebc4a3e5e7`, from `default/hypr/bindings/applications.lua` and `bin/omarchy-mise-install`.
 - `applications.lua`: v4.0.2, commit `346e69e1cec6c4e8924531874af6ba010a1bc99e`, from the same path. Unchanged in v4.0.4 and v4.0.6.
@@ -11,3 +11,22 @@ The upstream MIT license is retained in `OMARCHY-LICENSE`. Refresh fixtures deli
 The `quattro-10f1cbf` entry in `catalogues.json` and `applications-10f1cbf.lua` come from Quattro commit `10f1cbf7cfbeb8771697dbd493d2f2562db99d7b`. This snapshot uses the same source paths listed above; the binding fixture is from `default/hypr/bindings/applications.lua`. The mise generator at that revision is byte-identical to `mise-install.sh`. `desktops` contains webapp launchers; `native_desktops` preserves the upstream Foot, imv, and mpv desktop overrides as negative ownership fixtures. See the [catalogue review](../../docs/quattro-catalogue-10f1cbf.md) for retained legacy entries and current Hermes behavior.
 
 The `v4.0.6` entry in `catalogues.json` comes from release commit `237f1b4071a0bff2296c6d740ba2b9fd695ebfa0`, using the same source paths. Its packages, drop list, CLI tuples, and webapp/TUI desktops equal the `v4.0.4` entry. `native_desktops` adds the new `omarchy-browser` link handler next to Foot, imv, and mpv. See the [4.0.6 compatibility review](../../docs/v4.0.6-compatibility.md).
+
+The `v4.5.0` catalogue entry, `applications-4.5.0.lua`,
+`omarchy-tools-4.5.0.toml`, `mise-default-tools-4.5.0.sh`, and
+`mise-install-4.5.0.sh` are pinned to release commit
+`ac2690cd7be4f47e4a255f5e2e78d904d436b068`. Sources are the same package,
+remover and desktop paths above, plus `etc/mise/conf.d/omarchy-tools.toml`,
+`bin/omarchy-mise-default-tools`, and `bin/omarchy-mise-install`.
+`clis` is empty because the user installer no longer creates wrappers;
+`lazy_clis` records the new declarations and their command names, with
+`runtimes` kept separate. Aliases and Qwen's executable were verified against
+mise v2026.11.1 registry entries. The helper fixture runs only with a disposable
+home, a temporary tools file, and a stubbed `mise reshim`. The installer fixture
+creates wrappers without running their contents.
+
+`extract_catalogue.py CHECKOUT REVISION` reproduces these snapshots from a
+local upstream Git checkout without executing upstream code. All five older
+entries were reproduced before adding 4.5; the first three deliberately omit
+`native_desktops`, which was not recorded then. The extractor needs Python 3.11+
+for TOML; the runtime cleaner remains self-contained Bash.

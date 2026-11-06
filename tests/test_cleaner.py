@@ -152,11 +152,19 @@ class CleanerTests(unittest.TestCase):
     def test_catalogue_covers_upstream_and_retains_old_entries(self):
         text = SCRIPT.read_text()
         catalogue = text.split('DEFAULT_APPS=(', 1)[1].split('\n)', 1)[0]
-        all_packages = set(re.findall(r'"([a-z0-9.-]+)"', catalogue))
-        active = set(re.findall(r'^    "([a-z0-9.-]+)"', catalogue, re.M))
+        package_rows = re.findall(r'^    (?:# )?"([a-z0-9@+_.-]+)"', catalogue, re.M)
+        all_packages = set(package_rows)
+        self.assertEqual(len(package_rows), len(all_packages), 'Duplicate package entries')
+        active = set(re.findall(r'^    "([a-z0-9@+_.-]+)"', catalogue, re.M))
         for source in CATALOGUES.values():
             self.assertFalse(set(source['base']) - all_packages)
             self.assertFalse(set(source['drop']) - active)
+            for platform, packages in source.get('platform_additions', {}).items():
+                with self.subTest(platform=platform, revision=source['sha']):
+                    self.assertFalse(set(packages) - all_packages)
+                    self.assertFalse((set(packages) - set(source['base'])) & active,
+                                     'Platform additions must remain opt-in')
+            self.assertFalse(set(source.get('x86_64_only', [])) - all_packages)
             for cli in source['clis']:
                 with self.subTest(cli=cli):
                     self.install_mise(cli['package'], cli['command'])

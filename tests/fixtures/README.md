@@ -21,6 +21,8 @@ Catalogue entries record full commit IDs in `catalogues.json`:
 
 The catalogue extracts base packages from `install/omarchy-base.packages`, removable packages from `bin/omarchy-remove-preinstalls`, CLI tuples from `install/user/mise.sh`, and desktops from `applications/*.desktop`.
 
+The 4.5 snapshot also records `platform_additions` from `install/omarchy-aarch64*.packages` and the separate `x86_64_only` exclusion list. These follow `bin/omarchy-pkg-defaults`: base, shared architecture additions, then platform additions. The `omarchy-other.packages` ISO availability list is not a default set. Older snapshots omit these fields.
+
 Binding fixtures copy `default/hypr/bindings/applications.lua`; installer fixtures copy `bin/omarchy-mise-install` or `bin/omarchy-npx-install`. The 4.5 fixtures also copy `etc/mise/conf.d/omarchy-tools.toml` and `bin/omarchy-mise-default-tools`.
 
 Shared fixtures preserve these verified equivalences:

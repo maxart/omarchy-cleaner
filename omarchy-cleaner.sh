@@ -29,7 +29,7 @@ PLANNED_MISE_TOOLS=()
 MISE_PLAN_READY=false
 
 # App
-# List from: https://github.com/omacom/omarchy/blob/quattro/install/omarchy-base.packages
+# Lists from: https://github.com/omacom/omarchy/tree/v4.5.0/install
 # Apps Omarchy itself offers to drop live in: bin/omarchy-remove-preinstalls
 DEFAULT_APPS=(
     # Packages offered for removal. Floor is Omarchy 4's omarchy-remove-preinstalls
@@ -261,6 +261,45 @@ DEFAULT_APPS=(
     # "yt-dlp"
     # "zbar"
     # "zoxide"
+
+    # Architecture/platform additions from Omarchy 4.5.0 (all opt-in).
+    # These include boot, firmware, and driver packages: catalogue coverage
+    # does not imply safe removal. Keep components required by your hardware.
+    # Shared aarch64 defaults.
+    # "rtkit"                   # PipeWire realtime scheduling; removal can affect audio.
+    # "zram-generator"          # Compressed swap setup.
+
+    # Apple Silicon defaults.
+    # "omarchy-mac"             # Platform runtime and hardware dependencies.
+    # "omarchy-mac-boot"        # Boot integration.
+    # "asahi-bless"
+    # "avd-fw"
+    # "libva-v4l2_request-avd"
+    # "widevine"
+    # "wf-recorder"
+
+    # Qualcomm (Snapdragon) defaults.
+    # "linux-firmware-qcom"
+    # "qcom-firmware-extract"
+    # "systemd-ukify"           # Builds boot images with device trees.
+    # "vulkan-freedreno"
+    # "pipewire-libcamera"
+
+    # Shared NVIDIA N1x and GB10 defaults.
+    # "nvidia-open-dkms"
+    # "nvidia-utils"
+    # "libva-nvidia-driver"
+
+    # NVIDIA N1x defaults.
+    # "linux-omarchy"           # Kernel; retain a working kernel and boot setup.
+    # "linux-omarchy-headers"
+    # "pciutils"
+
+    # NVIDIA GB10 defaults (DGX Spark / ASUS Ascent GX10).
+    # "nvidia-container-toolkit"
+    # "rdma-core"
+    # "nsight-compute"
+    # "nsight-systems"
 )
 
 # Webapps

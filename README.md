@@ -29,6 +29,8 @@ The CLI group also backs up existing mise settings and attempts recovery if shim
 
 Edit `DEFAULT_APPS`, `DEFAULT_WEBAPPS`, `DEFAULT_TUIS`, or `DEFAULT_NPM_CLIS` in the script. Uncomment package entries to expand the offering. Older entries remain available when detected; the 4.5 CLI group always covers the complete upstream declaration file.
 
+Architecture-specific packages are grouped in a commented section. Some provide boot, firmware, graphics, or audio support; inclusion does not mean they are safe to remove.
+
 ## Development
 
 Run the isolated checks:

@@ -20,8 +20,12 @@ def extract(repo, revision):
     def read(path):
         return git('show', f'{revision}:{path}')
 
+    def packages(path):
+        return [name for line in read(path).splitlines()
+                if (name := line.split('#', 1)[0].strip())]
+
     files = git('ls-tree', '-r', '--name-only', revision).splitlines()
-    base = [line.split('#', 1)[0].strip() for line in read('install/omarchy-base.packages').splitlines()]
+    base = packages('install/omarchy-base.packages')
     remover = read('bin/omarchy-remove-preinstalls').replace('\\\n', ' ')
     drop = re.search(r'^\s*omarchy-pkg-drop\s+([^\n]+)', remover, re.M)
     assert drop, 'No removable package list'
@@ -32,8 +36,17 @@ def extract(repo, revision):
         args = shlex.split(line.split('omarchy-mise-install ', 1)[1], comments=True)
         clis.append({'package': args[0], 'command': args[1] if len(args) > 1 else args[0]})
     result = {'sha': git('rev-parse', revision + '^{commit}').strip(),
-              'base': [line for line in base if line], 'drop': shlex.split(drop[1]),
+              'base': base, 'drop': shlex.split(drop[1]),
               'clis': clis, 'desktops': {}, 'native_desktops': {}}
+    # These are additive lists consumed by omarchy-pkg-defaults. The "other"
+    # list is ISO availability, and x86_64-only is an ARM exclusion list.
+    additions = {Path(path).stem.removeprefix('omarchy-'): packages(path)
+                 for path in files
+                 if re.fullmatch(r'install/omarchy-aarch64(?:-[a-z0-9]+)?\.packages', path)}
+    if additions:
+        result['platform_additions'] = additions
+    if 'install/omarchy-x86_64-only.packages' in files:
+        result['x86_64_only'] = packages('install/omarchy-x86_64-only.packages')
     for path in files:
         if path.startswith('applications/') and path.endswith('.desktop'):
             content = read(path)

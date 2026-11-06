@@ -21,6 +21,7 @@ Omarchy Cleaner is a self-contained Bash script using gum for its terminal inter
 Compare against the exact Omarchy tag being claimed, using an available local upstream checkout. A Quattro development snapshot does not establish release compatibility. Re-read these sources when syncing:
 
 - `install/omarchy-base.packages`: default package names
+- `bin/omarchy-pkg-defaults` and `install/omarchy-aarch64*.packages`: architecture/platform additions; `omarchy-x86_64-only.packages` excludes base entries on ARM, while `omarchy-other.packages` lists ISO availability, not universal defaults
 - `bin/omarchy-remove-preinstalls`: minimum active removable package set
 - `applications/*.desktop`: webapp and terminal-launcher names and commands
 - `etc/mise/conf.d/omarchy-tools.toml`, `bin/omarchy-mise-default-tools`: 4.5 lazy defaults and opt-out contract
@@ -29,6 +30,8 @@ Compare against the exact Omarchy tag being claimed, using an available local up
 - Legacy `install/packaging/webapps.sh`, `install/packaging/npx.sh`, `bin/omarchy-npx-install`: older launcher and wrapper formats
 
 Keep every upstream removable package active, plus Cleaner's additional offerings. Other base packages belong in the commented catalogue. Retain older names such as `ghostty`, `alacritty`, and `xournalpp`; offer them only when detected.
+
+Keep architecture/platform additions commented and grouped by hardware. Preserve warnings for boot, firmware, driver, and audio components; being a default does not make removal safe. Capture these lists in pinned fixtures and check coverage without enabling them.
 
 Use exact package names, desktop basenames, and CLI command names. New webapps need `webapp_domains_for` entries. CLI wrappers need verified complete templates and explicit `cli_packages_for` mappings. Every webapp, terminal launcher, and CLI needs a functional description with a source in [item descriptions](docs/item-descriptions.md); packages use pacman's description. Keep descriptions out of fuzzy name search.
 
